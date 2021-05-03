@@ -1,0 +1,6 @@
+#!/bin/bash
+
+pandoc -s -t man vscpl2drv-template.1.md -o vscpl2drv-template.1
+tar -zcvf vscpl2drv-template.1.gz vscpl2drv-template.1
+sudo cp vscpl2drv-template.1.gz /usr/share/man/man1/
+mandb

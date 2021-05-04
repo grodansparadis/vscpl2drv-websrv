@@ -27,7 +27,7 @@
 #
 
 cmake_minimum_required(VERSION 3.5)
-project(vscpl2drv-tcpipsrv LANGUAGES CXX C)
+project(vscpl2drv-websock LANGUAGES CXX C)
 set(PACKAGE_AUTHOR "Ake Hedman, the VSCP Project")
 
 # Load packaging facilities.
@@ -35,7 +35,7 @@ INCLUDE(CPack)
 
 # Version settings
 if(NOT DEFINED MAJOR_VERSION)
-    SET(MAJOR_VERSION "1")
+    SET(MAJOR_VERSION "15")
 endif()
 if(NOT DEFINED MINOR_VERSION)
     SET(MINOR_VERSION "0")
@@ -45,20 +45,20 @@ if(NOT DEFINED PATCH_VERSION)
 endif()
 
 SET(CPACK_PACKAGE_DESCRIPTION "VSCP driver for tcp/ip server")
-SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "VSCP level II Driver for VSCP that export a server interface for the VSCP tcp/ip link protocol")
+SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "VSCP level II Driver for VSCP that export a server interface for the VSCP websocket 1/2 protocol")
 SET(CPACK_PACKAGE_VENDOR "the VSCP Project")
 SET(CPACK_PACKAGE_CONTACT "akhe@vscp.org")
 
 if(NOT DEFINED APP_LOW_NAME)
-set(APP_LOW_NAME "vscpl2drv-tcpipsrv")
+set(APP_LOW_NAME "vscpl2drv-websock")
 endif()
 
 if(NOT DEFINED APP_NAME)
-set(APP_NAME "VSCPL2DEV-TCPIPSRV")
+set(APP_NAME "VSCPL2DEV-WEBSOCKET")
 endif()
 
 if(NOT DEFINED APP_URL)
-set(APP_URL "https://github.com/grodansparadis/vscpl2drv-tcpipsrv")
+set(APP_URL "https://github.com/grodansparadis/vscpl2drv-websock")
 endif()
 
 if(NOT DEFINED APP_VERSION)
@@ -97,7 +97,7 @@ include(GNUInstallDirs)
 
 # --- Path to vscp --- 
 if (NOT DEFINED VSCP_PATH)
-set (VSCP_PATH "${PROJECT_SOURCE_DIR}/../vscp")
+set (VSCP_PATH "${PROJECT_SOURCE_DIR}/../vscp/")
 endif()
 
 if(WIN32)
@@ -196,14 +196,15 @@ set(RESOURCE_FILES
         forms/index.html)
 
 # Add files to library
-add_library(vscpl2drv-tcpipsrv
-    ./src/vscpl2drv-tcpipsrv.cpp
-    ./src/tcpipsrv.cpp
-    ./src/srv.cpp 
+add_library(vscpl2drv-websock
+    ./src/vscpl2drv-websock.cpp
+    ./src/websockobj.cpp
+    ${VSCP_PATH}/src/vscp/common/websocketsrv.cpp
     ${VSCP_PATH}/src/vscp/common/userlist.h
     ${VSCP_PATH}/src/vscp/common/userlist.cpp
     ${VSCP_PATH}/src/vscp/common/clientlist.h
-    ${VSCP_PATH}/src/vscp/common/clientlist.cpp   
+    ${VSCP_PATH}/src/vscp/common/clientlist.cpp
+    ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/civetweb.c
     ${VSCP_PATH}/src/common/third_party/mustache.hpp
     ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include    
     ${VSCP_PATH}/src/vscp/common/vscp.h
@@ -232,10 +233,9 @@ add_library(vscpl2drv-tcpipsrv
     ${VSCP_PATH}/src/common/vscpmd5.c
     ${VSCP_PATH}/src/common/fastpbkdf2.h
     ${VSCP_PATH}/src/common/fastpbkdf2.c
-  ) 
+) 
 
-if (WIN32)
-    
+if (WIN32)    
     find_package(pthreads REQUIRED)
     find_path(PTHREAD_INCLUDE_DIR pthread.h)
 
@@ -245,6 +245,7 @@ if (WIN32)
         ${VSCP_PATH}/src/common/third_party
         ${VSCP_PATH}/src/common/third_party/nlohmann
         ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/include
         ${PThreads4W_INCLUDE_DIR}
         ${CMAKE_BINARY_DIR}
         ${OPENSSL_INCLUDE_DIR}
@@ -257,13 +258,14 @@ else()
         ${VSCP_PATH}/src/common/third_party
         ${VSCP_PATH}/src/common/third_party/nlohmann
         ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/include
         ${CMAKE_BINARY_DIR}
         ${OPENSSL_INCLUDE_DIR}
         ${LOCAL_SYSLOG_INCLUDE} )
- endif()   
+endif()   
 
 if (WIN32)
-    target_link_libraries(vscpl2drv-tcpipsrv PRIVATE     
+    target_link_libraries(vscpl2drv-websock PRIVATE     
         PThreads4W::PThreads4W_CXXEXC
         OpenSSL::SSL 
         OpenSSL::Crypto
@@ -272,7 +274,7 @@ if (WIN32)
     )
         
 else()
-    target_link_libraries(vscpl2drv-tcpipsrv PRIVATE     
+    target_link_libraries(vscpl2drv-websock PRIVATE     
         m
         dl
         Threads::Threads
@@ -285,7 +287,7 @@ endif()
 # Install
 if(WIN32)
     # Runtime files
-    install(TARGETS vscpl2drv-tcpipsrv
+    install(TARGETS vscpl2drv-websock
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
     # Dependencies
@@ -296,7 +298,7 @@ if(WIN32)
     # README
     install(FILES "${CMAKE_BINARY_DIR}/../README.md" DESTINATION "${CMAKE_INSTALL_BINDIR}/..")
 else()
-    install(TARGETS vscpl2drv-tcpipsrv
+    install(TARGETS vscpl2drv-websock
             LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_}${VSCP_LEVEL2_DRV_DIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_MANDIR}            
             RESOURCE DESTINATION ${CMAKE_INSTALL_FULL_}/var/lib/vscp/vscpd) 

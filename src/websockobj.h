@@ -1,4 +1,4 @@
-// socketcan.h: interface for the socketcan class.
+// websockobj.h: interface for the socketcan class.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -7,8 +7,8 @@
 //
 // This file is part of the VSCP (http://www.vscp.org)
 //
-// Copyright (C) 2000-2020 Ake Hedman,
-// Grodans Paradis AB, <akhe@grodansparadis.com>
+// Copyright (C) 2000-2021 Ake Hedman,
+// the VSCP Project, <akhe@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -41,15 +41,15 @@
 #include <dllist.h>
 #include <guid.h>
 #include <vscp.h>
-#include <vscpremotetcpif.h>
+#include <websocket.h>
 
 // Seconds before trying to reconnect to a broken connection
-#define VSCP_TCPIPLINK_DEFAULT_RECONNECT_TIME 30
+#define VSCP_WS1_DEFAULT_RECONNECT_TIME 30
 
-#define VSCP_TCPIPLINK_SYSLOG_DRIVER_ID "[vscpl2drv-template] "
-#define VSCP_LEVEL2_DLL_LOGGER_OBJ_MUTEX                                       \
+#define VSCP_WS1_SYSLOG_DRIVER_ID "[vscpl2drv-ws1] "
+#define VSCP_LEVEL2_DLL_WS1_OBJ_MUTEX                                       \
     "___VSCP__DLL_L2TCPIPLINK_OBJ_MUTEX____"
-#define VSCP_SOCKETCAN_LIST_MAX_MSG 2048
+#define VSCP_WS1_LIST_MAX_MSG 2048
 
 // Module Local HLO op's
 #define HLO_OP_LOCAL_CONNECT      HLO_OP_USER_DEFINED + 0
@@ -61,23 +61,23 @@ class CWrkReceiveTread;
 class VscpRemoteTcpIf;
 class CHLO;
 
-class CTcpipLink
+class CWS1
 {
   public:
     /// Constructor
-    CTcpipLink();
+    CWS1();
 
     /// Destructor
-    virtual ~CTcpipLink();
+    virtual ~CWS1();
 
     /*!
-        Open
-        @return True on success.
+      Open
+      @return True on success.
      */
-    bool open(std::string& path, const cguid& guid);
+    bool open(std::string &path, const cguid &guid);
 
     /*!
-        Flush and close the log file
+      Flush and close the log file
      */
     void close(void);
 
@@ -112,8 +112,8 @@ class CTcpipLink
 
     /*!
         Add event to send queue
-     */
-    bool addEvent2SendQueue(const vscpEvent* pEvent);
+    */
+    bool addEvent2SendQueue(const vscpEvent *pEvent);
 
   public:
 
@@ -161,10 +161,10 @@ class CTcpipLink
     pthread_t m_pthreadReceive;
 
     /// VSCP remote server send interface
-    VscpRemoteTcpIf m_srvRemoteSend;
+    //VscpRemoteTcpIf m_srvRemoteSend;
 
     /// VSCP remote server receive interface
-    VscpRemoteTcpIf m_srvRemoteReceive;
+    //VscpRemoteTcpIf m_srvRemoteReceive;
 
     // Queue
     std::list<vscpEvent*> m_sendList;

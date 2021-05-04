@@ -1,4 +1,4 @@
-// vscp2drv_tcpiplink.h : main header file for the canallogger.dll
+// vscp2drv-websocket.h : main header file for the canallogger.dll
 // Linux version
 //
 // This program is free software; you can redistribute it and/or
@@ -8,8 +8,8 @@
 // 
 // This file is part of the VSCP (http://www.vscp.org) 
 //
-// Copyright (C) 2000-2020 Ake Hedman, 
-// Ake Hedman, Grodans Paradis AB, <akhe@grodansparadis.com>
+// Copyright (C) 2000-2021 Ake Hedman, 
+// the VSCP Project, <akhe@vscp.org>
 // 
 // This file is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -35,12 +35,12 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <canal.h>
-#include <vscpremotetcpif.h>
+#include <websocket.h>
 #include <canal_macro.h>
 #include <vscp.h>
 #include <hlo.h>
 
-#include "tcpiplink.h"
+#include "websockobj.h"
 
 #ifndef BOOL
 typedef int BOOL;
@@ -62,7 +62,7 @@ typedef int BOOL;
     @return handle or 0 for error
 */
 long
-addDriverObject(CTcpipLink *pif);
+addDriverObject(CWS1 *pif);
 
 /*!
     Get a driver object from its handle
@@ -71,7 +71,7 @@ addDriverObject(CTcpipLink *pif);
     @return pointer to object or NULL if invalid
             handle.
 */
-CTcpipLink *
+CWS1 *
 getDriverObject(long handle);
 
 /*!

@@ -204,6 +204,15 @@ add_library(vscpl2drv-websock
     ${VSCP_PATH}/src/vscp/common/userlist.cpp
     ${VSCP_PATH}/src/vscp/common/clientlist.h
     ${VSCP_PATH}/src/vscp/common/clientlist.cpp
+    ${VSCP_PATH}/src/vscp/common/web_template.h
+    ${VSCP_PATH}/src/vscp/common/web_js.h
+    ${VSCP_PATH}/src/vscp/common/web_css.h
+    ${VSCP_PATH}/src/vscp/common/websrv.h
+    ${VSCP_PATH}/src/vscp/common/websrv.cpp
+    ${VSCP_PATH}/src/vscp/common/lua_vscp_func.h
+    ${VSCP_PATH}/src/vscp/common/lua_vscp_func.cpp
+    ${VSCP_PATH}/src/vscp/common/lua_vscp_wrkthread.h
+    ${VSCP_PATH}/src/vscp/common/lua_vscp_wrkthread.cpp
     ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/civetweb.c
     ${VSCP_PATH}/src/common/third_party/mustache.hpp
     ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include    

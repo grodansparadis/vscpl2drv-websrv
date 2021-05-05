@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/home/akhe/development/VSCP/vscp/build/vscpd",
-            "args": ["-s","-c/home/akhe/development/VSCP/vscpl2drv-websock/debug/linux/vscpd.json"],
+            "args": ["-s","-c/home/akhe/development/VSCP/vscpl2drv-websrv/debug/linux/vscpd.json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/../vscp",
             "environment": [],
@@ -22,7 +22,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build vscpl2drv-websock",
+            "preLaunchTask": "build vscpl2drv-websrv",
             "miDebuggerPath": "/usr/bin/gdb"
         }
     ]

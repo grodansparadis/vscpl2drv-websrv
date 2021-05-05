@@ -27,7 +27,7 @@
 #
 
 cmake_minimum_required(VERSION 3.5)
-project(vscpl2drv-websock LANGUAGES CXX C)
+project(vscpl2drv-websrv LANGUAGES CXX C)
 set(PACKAGE_AUTHOR "Ake Hedman, the VSCP Project")
 
 # Load packaging facilities.
@@ -50,7 +50,7 @@ SET(CPACK_PACKAGE_VENDOR "the VSCP Project")
 SET(CPACK_PACKAGE_CONTACT "akhe@vscp.org")
 
 if(NOT DEFINED APP_LOW_NAME)
-set(APP_LOW_NAME "vscpl2drv-websock")
+set(APP_LOW_NAME "vscpl2drv-websrv")
 endif()
 
 if(NOT DEFINED APP_NAME)
@@ -58,7 +58,7 @@ set(APP_NAME "VSCPL2DEV-WEBSOCKET")
 endif()
 
 if(NOT DEFINED APP_URL)
-set(APP_URL "https://github.com/grodansparadis/vscpl2drv-websock")
+set(APP_URL "https://github.com/grodansparadis/vscpl2drv-websrv")
 endif()
 
 if(NOT DEFINED APP_VERSION)
@@ -196,8 +196,8 @@ set(RESOURCE_FILES
         forms/index.html)
 
 # Add files to library
-add_library(vscpl2drv-websock
-    ./src/vscpl2drv-websock.cpp
+add_library(vscpl2drv-websrv
+    ./src/vscpl2drv-websrv.cpp
     ./src/webobj.h
     ./src/webobj.cpp
     ./src/websocketsrv.h
@@ -297,7 +297,7 @@ else()
 endif()   
 
 if (WIN32)
-    target_link_libraries(vscpl2drv-websock PRIVATE     
+    target_link_libraries(vscpl2drv-websrv PRIVATE     
         PThreads4W::PThreads4W_CXXEXC
         OpenSSL::SSL 
         OpenSSL::Crypto
@@ -306,7 +306,7 @@ if (WIN32)
     )
         
 else()
-    target_link_libraries(vscpl2drv-websock PRIVATE     
+    target_link_libraries(vscpl2drv-websrv PRIVATE     
         m
         dl
         Threads::Threads
@@ -319,7 +319,7 @@ endif()
 # Install
 if(WIN32)
     # Runtime files
-    install(TARGETS vscpl2drv-websock
+    install(TARGETS vscpl2drv-websrv
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
     # Dependencies
@@ -330,7 +330,7 @@ if(WIN32)
     # README
     install(FILES "${CMAKE_BINARY_DIR}/../README.md" DESTINATION "${CMAKE_INSTALL_BINDIR}/..")
 else()
-    install(TARGETS vscpl2drv-websock
+    install(TARGETS vscpl2drv-websrv
             LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_}${VSCP_LEVEL2_DRV_DIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_MANDIR}            
             RESOURCE DESTINATION ${CMAKE_INSTALL_FULL_}/var/lib/vscp/vscpd) 

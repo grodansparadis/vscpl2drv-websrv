@@ -38,7 +38,7 @@
 #include <vscphelper.h>
 
 #include "version.h"
-#include "vscpl2drv-websock.h"
+#include "vscpl2drv-websrv.h"
 #include "webobj.h"
 
 void

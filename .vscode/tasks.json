@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "taskName": "build vscpl2drv-websock",
+            "taskName": "build vscpl2drv-websrv",
             "type": "shell",
             "command": "cd build; cmake .. -DCMAKE_BUILD_TYPE=Debug; make",
             "args": [],
@@ -13,7 +13,7 @@
             "problemMatcher": "$gcc"
         },
         {
-            "taskName": "clean & build vscpl2drv-websock",
+            "taskName": "clean & build vscpl2drv-websrv",
             "type": "shell",
             "command": "mkdir build; cd build; cmake .. -DCMAKE_BUILD_TYPE=Debug; make clean; make",
             "args": [],

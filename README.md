@@ -1,17 +1,17 @@
-# vscpl2drv-websock
+# vscpl2drv-websrv
 
 <img src="https://vscp.org/images/logo.png" width="100">
 
     Available for: Linux, Windows
-    Driver Linux: vscpl2drv-websock.so
-    Driver Windows: vscpl2drv-websock.dll
+    Driver Linux: vscpl2drv-websrv.so
+    Driver Windows: vscpl2drv-websrv.dll
 
 The tcp/ip driver act as a tcp/ip server for the [VSCP tcp/ip link protocol](https://grodansparadis.github.io/vscp-doc-spec/#/./vscp_over_tcp_ip). Users or IoT/m2m devices with different privileges and rights can connect to the exported interface and send/receive VSCP events.
 
 ## Install the driver on Linux
 You can install the driver using the debian package with
 
-> sudo apt install ./vscpl2drv-websock_x.y.z.deb
+> sudo apt install ./vscpl2drv-websrv_x.y.z.deb
 
 the driver will be installed to /var/lib/vscp/drivers/level2
 
@@ -19,9 +19,9 @@ After installing the driver you need to add it to the vscpd.conf file (/etc/vscp
 
 You also need to set up a configuration file for the driver. If you don't need to dynamically edit the content of this file a good and safe location for this is in the */etc/vscp/* folder alongside the VSCP daemon configuration file.
 
-If you need to do dynamic configuration we recommend that you create the file in the */var/vscp/vscpl2drv-websock.so*
+If you need to do dynamic configuration we recommend that you create the file in the */var/vscp/vscpl2drv-websrv.so*
 
-A sample configuration file is make available in */usr/share/vscpl2drv-websock.so* after installation.
+A sample configuration file is make available in */usr/share/vscpl2drv-websrv.so* after installation.
 
 ## Install the driver on Windows
 tbd
@@ -29,14 +29,14 @@ tbd
 ## How to build the driver on Linux
 
 - sudo git clone https://github.com/grodansparadis/vscp.git
-- sudo https://github.com/grodansparadis/vscpl2drv-websock.git development
+- sudo https://github.com/grodansparadis/vscpl2drv-websrv.git development
 - sudo apt install pandoc           (comment: optional)
 - sudo apt install build-essential
 - sudo apt install cmake
 - sudo apt install libexpat-dev
 - sudo apt install libssl-dev
 - sudo apt install rpm              (comment: only if you want to create install packages)
-- cd vscpl2drv-websock
+- cd vscpl2drv-websrv
 - mkdir build
 - cd build
 - cmake ..
@@ -51,8 +51,8 @@ Install of pandoc is only needed if man pages needs to be rebuilt. This is norma
 
 
 ```
-git clone --recurse-submodules -j8 https://github.com/grodansparadis/vscpl2drv-websock.so.git
-cd vscpl2drv-websock
+git clone --recurse-submodules -j8 https://github.com/grodansparadis/vscpl2drv-websrv.so.git
+cd vscpl2drv-websrv
 ./configure
 make
 make install
@@ -115,10 +115,10 @@ You need to checkout the VSCP main repository code in addition to the driver rep
   git checkout development
 ``` 
 
-and the vscpl2drv-websock code
+and the vscpl2drv-websrv code
 
 ```bash
-git clone https://github.com/grodansparadis/vscpl2drv-websock.git
+git clone https://github.com/grodansparadis/vscpl2drv-websrv.git
 ```
 
 If you check out both at the same directory level the *-DVSCP_PATH=path-vscp-repository* in next step is not needed.
@@ -128,7 +128,7 @@ If you check out both at the same directory level the *-DVSCP_PATH=path-vscp-rep
 Build as usual but use
 
 ```bash
-cd vscpl2drv-websock
+cd vscpl2drv-websrv
 mkdir build
 cd build
 cmake .. -CMAKE_BUILD_TYPE=Release|Debug -DCMAKE_TOOLCHAIN_FILE=E:\src\vcpkg\scripts\buildsystems\vcpkg.cmake -DVSCP_PATH=path-vscp-repository
@@ -178,7 +178,7 @@ in the build folder.
 
 #### VSCP daemon driver config
 
-The VSCP daemon configuration is (normally) located at */etc/vscp/vscpd.conf*. To use the vscpl2drv-websock.so driver there must be an entry in the
+The VSCP daemon configuration is (normally) located at */etc/vscp/vscpd.conf*. To use the vscpl2drv-websrv.so driver there must be an entry in the
 
 ```
 > <level2driver enable="true">
@@ -190,8 +190,8 @@ section on the following format
 <!-- Level II TCP/IP Server -->
 <driver enable="true"
     name="vscp-tcpip-srv"
-    path-driver="/usr/lib/vscp/drivers/level2/vscpl2drv-websock.so"
-    path-config="/etc/vscp/vscpl2drv-websock.conf"
+    path-driver="/usr/lib/vscp/drivers/level2/vscpl2drv-websrv.so"
+    path-config="/etc/vscp/vscpl2drv-websrv.conf"
     guid="FF:FF:FF:FF:FF:FF:FF:FC:88:99:AA:BB:CC:DD:EE:FF"
 </driver>
 ```
@@ -203,12 +203,12 @@ Set enable to "true" if the driver should be loaded.
 This is the name of the driver. Used when referring to it in different interfaces.
 
 ##### path
-This is the path to the driver. If you install from a Debian package this will be */usr/bin/vscpl2drv-websock.so* and if you build and install the driver yourself it will be */usr/local/bin/vscpl2drv-websock.so* or a custom location if you configured that.
+This is the path to the driver. If you install from a Debian package this will be */usr/bin/vscpl2drv-websrv.so* and if you build and install the driver yourself it will be */usr/local/bin/vscpl2drv-websrv.so* or a custom location if you configured that.
 
 ##### guid
 All level II drivers must have a unique GUID. There is many ways to obtain this GUID, Read more [here](https://grodansparadis.gitbooks.io/the-vscp-specification/vscp_globally_unique_identifiers.html).
 
-#### vscpl2drv-websock driver config
+#### vscpl2drv-websrv driver config
 
 On start up the configuration is read from the path set in the driver configuration of the VSCP daemon, usually */etc/vscp/conf-file-name* and values are set from this location. If the **write** parameter is set to "true" the above location is a bad choice as the VSCP daemon will not be able to write to it. A better location is */var/lib/vscp/drivername/configure.xml* or some other writable location.
 
@@ -450,5 +450,5 @@ Max priority (0-7) this user can use for send events. Trying to send an event wi
 ### Windows
 See information from Linux. The only difference is the disk location from where configuration data is fetched.
 
-## Using the vscpl2drv-websock driver
+## Using the vscpl2drv-websrv driver
 

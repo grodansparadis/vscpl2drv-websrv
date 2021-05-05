@@ -35,12 +35,12 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <canal.h>
-#include <websocket.h>
+//#include <websocket.h>
 #include <canal_macro.h>
 #include <vscp.h>
 #include <hlo.h>
 
-#include "websockobj.h"
+#include "webobj.h"
 
 #ifndef BOOL
 typedef int BOOL;
@@ -62,7 +62,7 @@ typedef int BOOL;
     @return handle or 0 for error
 */
 long
-addDriverObject(CWS1 *pif);
+addDriverObject(CWebObj *pif);
 
 /*!
     Get a driver object from its handle
@@ -71,7 +71,7 @@ addDriverObject(CWS1 *pif);
     @return pointer to object or NULL if invalid
             handle.
 */
-CWS1 *
+CWebObj *
 getDriverObject(long handle);
 
 /*!

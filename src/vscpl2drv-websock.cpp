@@ -35,10 +35,11 @@
 
 #include <vscp.h>
 #include <hlo.h>
+#include <vscphelper.h>
 
 #include "version.h"
 #include "vscpl2drv-websock.h"
-#include "websockobj.h"
+#include "webobj.h"
 
 void
 _init() __attribute__((constructor));
@@ -51,7 +52,7 @@ void
 _fini() __attribute__((destructor));
 
 // This map holds driver handles/objects
-static std::map<long, CWS1*> g_ifMap;
+static std::map<long, CWebObj*> g_ifMap;
 
 // Mutex for the map object
 static pthread_mutex_t g_mapMutex;
@@ -81,12 +82,12 @@ _fini()
 
     LOCK_MUTEX(g_mapMutex);
 
-    for (std::map<long, CWS1*>::iterator it = g_ifMap.begin();
+    for (std::map<long, CWebObj*>::iterator it = g_ifMap.begin();
          it != g_ifMap.end();
          ++it) {
         // std::cout << it->first << " => " << it->second << '\n';
 
-        CWS1* pif = it->second;
+        CWebObj* pif = it->second;
         if (NULL != pif) {
             //pif->m_srvRemoteSend.doCmdClose();
             //pif->m_srvRemoteReceive.doCmdClose();
@@ -106,9 +107,9 @@ _fini()
 //
 
 long
-addDriverObject(CWS1* pif)
+addDriverObject(CWebObj* pif)
 {
-    std::map<long, CWS1*>::iterator it;
+    std::map<long, CWebObj*>::iterator it;
     long h = 0;
 
     LOCK_MUTEX(g_mapMutex);
@@ -132,10 +133,10 @@ addDriverObject(CWS1* pif)
 // getDriverObject
 //
 
-CWS1*
+CWebObj*
 getDriverObject(long h)
 {
-    std::map<long, CWS1*>::iterator it;
+    std::map<long, CWebObj*>::iterator it;
     long idx = h - 1681;
 
     // Check if valid handle
@@ -157,7 +158,7 @@ getDriverObject(long h)
 void
 removeDriverObject(long h)
 {
-    std::map<long, CWS1*>::iterator it;
+    std::map<long, CWebObj*>::iterator it;
     long idx = h - 1681;
 
     // Check if valid handle
@@ -168,7 +169,7 @@ removeDriverObject(long h)
     LOCK_MUTEX(g_mapMutex);
     it = g_ifMap.find(idx);
     if (it != g_ifMap.end()) {
-        CWS1* pObj = it->second;
+        CWebObj* pObj = it->second;
         if (NULL != pObj) {
             delete pObj;
             pObj = NULL;
@@ -191,7 +192,7 @@ VSCPOpen(const char* pPathConfig, const char* pguid)
 {
     long h = 0;
 
-    CWS1* pdrvObj = new CWS1();
+    CWebObj* pdrvObj = new CWebObj();
     if (NULL != pdrvObj) {
 
         cguid guid(pguid);
@@ -217,7 +218,7 @@ VSCPOpen(const char* pPathConfig, const char* pguid)
 extern "C" int
 VSCPClose(long handle)
 {
-    CWS1* pdrvObj = getDriverObject(handle);
+    CWebObj* pdrvObj = getDriverObject(handle);
     if (NULL == pdrvObj)
         return 0;
     pdrvObj->close();
@@ -233,7 +234,7 @@ VSCPClose(long handle)
 extern "C" int
 VSCPWrite(long handle, const vscpEvent* pEvent, unsigned long timeout)
 {
-    CWS1* pdrvObj = getDriverObject(handle);
+    CWebObj* pdrvObj = getDriverObject(handle);
     if (NULL == pdrvObj)
         return CANAL_ERROR_MEMORY;
 
@@ -255,7 +256,7 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
     if (NULL == pEvent)
         return CANAL_ERROR_PARAMETER;
 
-    CWS1* pdrvObj = getDriverObject(handle);
+    CWebObj* pdrvObj = getDriverObject(handle);
     if (NULL == pdrvObj)
         return CANAL_ERROR_MEMORY;
 

@@ -31,6 +31,7 @@
 
 #include <vscp.h>
 #include <clientlist.h>
+#include "webobj.h"
 
 //******************************************************************************
 //                                WEBSOCKETS
@@ -97,6 +98,14 @@ enum
 #define WS_TYPE_1 1
 #define WS_TYPE_2 2
 
+class CWebObj;
+
+// ----------------------------------------------------------------------------
+
+/*!
+    websocket session
+*/
+
 class websock_session
 {
 
@@ -119,9 +128,6 @@ class websock_session
     // 16 byte iv (SID) for this session
     char m_sid[33];
 
-    // System key
-    uint8_t m_systemKey[32];
-
     // Protocol version
     int m_version; // Sec-WebSocket-Version
 
@@ -134,7 +140,8 @@ class websock_session
     // Client structure for websocket 
     CClientItem* m_pClientItem;
 
-    m_clientList
+    // Owner of this session
+    CWebObj *m_pParent;
 };
 
 #define WS2_COMMAND                                                            \
@@ -180,6 +187,10 @@ const int MSG_TYPE_RESPONSE_POSITIVE = 3; // Positive reply
 const int MSG_TYPE_RESPONSE_NEGATIVE = 4; // Negative reply
 const int MSG_TYPE_VARIABLE          = 5; // Changed variable
 
+/*!
+    w2msg - Web socket message
+*/
+
 class w2msg
 {
   public:
@@ -205,6 +216,6 @@ class w2msg
 // Public functions
 
 void
-websock_post_incomingEvents(void);
+websock_post_incomingEvents(const websock_session* pSession);
 
 #endif

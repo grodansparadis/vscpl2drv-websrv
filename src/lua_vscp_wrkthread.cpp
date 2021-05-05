@@ -51,9 +51,7 @@ extern "C"
 #include "civetweb_private_lua.h"
 #include "civetweb.h"
 #include "civetweb_lua.h"
-
 #include <actioncodes.h>
-#include <controlobject.h>
 #include <lua_vscp_func.h>
 #include <lua_vscp_wrkthread.h>
 #include <userlist.h>
@@ -65,12 +63,6 @@ extern "C"
 #include <vscphelper.h>
 #include <vscpremotetcpif.h>
 
-
-///////////////////////////////////////////////////
-//                 GLOBALS
-///////////////////////////////////////////////////
-
-extern CControlObject *gpobj;
 
 ///////////////////////////////////////////////////
 //                   KEYS

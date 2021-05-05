@@ -30,6 +30,8 @@
 #define VSCP_JAVASCRIPT__INCLUDED_
 
 #include <vscpdatetime.h>
+#include <clientlist.h>
+#include <webobj.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // actionJavascriptObj
@@ -66,6 +68,9 @@ class actionJavascriptObj
 
     /// Client item for script
     CClientItem *m_pClientItem;
+
+    /// Pointer to owner
+    CWebObj *pParent;
 
     /// Feed event
     vscpEventEx m_feedEvent;

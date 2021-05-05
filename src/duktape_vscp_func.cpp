@@ -44,7 +44,6 @@
 #include <json.hpp> // Needs C++11  -std=c++11
 
 #include <actioncodes.h>
-#include <controlobject.h>
 //#include <duk_module_node.h>
 #include <duktape.h>
 #include <duktape_vscp_func.h>
@@ -55,17 +54,12 @@
 #include <vscpdb.h>
 #include <vscphelper.h>
 #include <vscpremotetcpif.h>
+#include <clientlist.h>
 
 using namespace std;
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
-
-///////////////////////////////////////////////////
-//                   GLOBALS
-///////////////////////////////////////////////////
-
-extern CControlObject* gpobj;
 
 ///////////////////////////////////////////////////
 //                  HELPERS
@@ -361,8 +355,8 @@ js_vscp_readVariable(duk_context* ctx)
 
     // duk_pop_n(ctx, 3); // Clear stack
 
-    // CUserItem *pAdminUser = gpobj->m_userList.getUser(USER_ID_ADMIN);
-    // if (!gpobj->m_variables.find(varName, pAdminUser, variable)) {
+    // CUserItem *pAdminUser = pObj->m_userList.getUser(USER_ID_ADMIN);
+    // if (!pObj->m_variables.find(varName, pAdminUser, variable)) {
     //     duk_push_null(ctx); // Return failure
     //     return JAVASCRIPT_OK;
     // }
@@ -408,8 +402,8 @@ js_vscp_writeVariable(duk_context* ctx)
     //     return JAVASCRIPT_OK;
     // }
 
-    // CUserItem *pAdminUser = gpobj->m_userList.getUser(USER_ID_ADMIN);
-    // if (!gpobj->m_variables.find(varName, pAdminUser, variable)) {
+    // CUserItem *pAdminUser = pObj->m_userList.getUser(USER_ID_ADMIN);
+    // if (!pObj->m_variables.find(varName, pAdminUser, variable)) {
 
     //     // Variable does not exist - should be created
 
@@ -462,7 +456,7 @@ js_vscp_writeVariable(duk_context* ctx)
     //     } else if (duk_is_string(ctx, -1)) {
     //         std::string strUser(duk_get_string_default(ctx, -1, ""));
     //         CUserItem *pUser;
-    //         pUser = gpobj->m_userList.getUser(strUser);
+    //         pUser = pObj->m_userList.getUser(strUser);
     //         if (NULL == pUser) {
     //             duk_push_boolean(ctx, 0); // return code false
     //             return JAVASCRIPT_OK;
@@ -509,7 +503,7 @@ js_vscp_writeVariable(duk_context* ctx)
 
     //     duk_pop_n(ctx, 1);
 
-    //     if (!gpobj->m_variables.add(varName,
+    //     if (!pObj->m_variables.add(varName,
     //                                 strValue,
     //                                 type,
     //                                 userid,
@@ -544,7 +538,7 @@ js_vscp_writeVariable(duk_context* ctx)
     //     duk_pop_n(ctx, 2); // Clear stack
 
     //     // Update variable storage
-    //     if (!gpobj->m_variables.update(variable, pAdminUser)) {
+    //     if (!pObj->m_variables.update(variable, pAdminUser)) {
     //         duk_push_boolean(ctx, 0); // return code false
     //         return JAVASCRIPT_OK;
     //     }
@@ -576,8 +570,8 @@ js_vscp_deleteVariable(duk_context* ctx)
     //     return JAVASCRIPT_OK;
     // }
 
-    // CUserItem *pAdminUser = gpobj->m_userList.getUser(USER_ID_ADMIN);
-    // if (!gpobj->m_variables.remove(varName,pAdminUser)) {
+    // CUserItem *pAdminUser = pObj->m_userList.getUser(USER_ID_ADMIN);
+    // if (!pObj->m_variables.remove(varName,pAdminUser)) {
     //     duk_push_boolean(ctx, 0); // return code false
     //     return JAVASCRIPT_OK;
     // }
@@ -642,12 +636,12 @@ js_vscp_sendEvent(duk_context* ctx)
     }
     duk_pop_n(ctx, 2);
 
-    if (!gpobj->sendEvent(pClientItem, pEvent)) {
-        // Failed to send event
-        vscp_deleteEvent_v2(&pEvent);
-        duk_push_boolean(ctx, 0); // return code false
-        return JAVASCRIPT_OK;
-    }
+    // if (!pObj->sendEvent(pEvent)) {  TODO
+    //     // Failed to send event
+    //     vscp_deleteEvent_v2(&pEvent);
+    //     duk_push_boolean(ctx, 0); // return code false
+    //     return JAVASCRIPT_OK;
+    // }
 
     vscp_deleteEvent_v2(&pEvent);
 
@@ -1096,12 +1090,12 @@ js_send_Measurement(duk_context* ctx)
     }
 
     // Send the event
-    if (!gpobj->sendEvent(pClientItem, pEvent)) {
-        // Failed to send event
-        vscp_deleteEvent_v2(&pEvent);
-        duk_push_boolean(ctx, 0); // return code failure
-        return JAVASCRIPT_OK;
-    }
+    // if (!pObj->sendEvent(pEvent)) {  // TODO
+    //     // Failed to send event
+    //     vscp_deleteEvent_v2(&pEvent);
+    //     duk_push_boolean(ctx, 0); // return code failure
+    //     return JAVASCRIPT_OK;
+    // }
 
     vscp_deleteEvent_v2(&pEvent);
 

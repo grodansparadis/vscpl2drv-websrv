@@ -36,7 +36,6 @@
 #include <unistd.h>
 
 #include <actioncodes.h>
-#include <controlobject.h>
 #include <duk_module_node.h>
 #include <duktape.h>
 #include <duktape_vscp_func.h>
@@ -49,12 +48,6 @@
 #include <vscpremotetcpif.h>
 
 #include "duktape_vscp_wrkthread.h"
-
-///////////////////////////////////////////////////
-//                 GLOBALS
-///////////////////////////////////////////////////
-
-extern CControlObject *gpobj;
 
 ///////////////////////////////////////////////////////////////////////////////
 // actionJavascriptObj
@@ -78,15 +71,18 @@ actionJavascriptObj::~actionJavascriptObj() {}
 void *
 actionJavascriptThread(void *pData)
 {
-    actionJavascriptObj *pobj = (actionJavascriptObj *)pData;
-    if (NULL == pobj) {
+    actionJavascriptObj *pActionObj = (actionJavascriptObj *)pData;
+    if (NULL == pActionObj) {
         syslog(LOG_ERR,
                "[Javascript execution] - "
                "No control object, can't execute code.");
         return NULL;
     }
 
-    pobj->m_start = vscpdatetime::Now(); // Mark start time
+    CWebObj *pObj = (CWebObj *)pActionObj->pParent;;
+    if (NULL == pObj) return NULL; 
+
+    pActionObj->m_start = vscpdatetime::Now(); // Mark start time
 
     // Create new JavaScript context
     duk_context *ctx = duk_create_heap_default();
@@ -159,22 +155,22 @@ actionJavascriptThread(void *pData)
     duk_put_global_string(ctx, "vscp_getMeasurementSubZone");
 
     // Save the DM feed event for easy access
-    std::string strEvent;
-    vscp_convertEventExToJSON(strEvent, &pobj->m_feedEvent );
-    duk_push_string(ctx, (const char *)strEvent.c_str());
-    duk_json_decode(ctx, -1);
-    duk_put_global_string(ctx, "vscp_feedevent");
+    // std::string strEvent;
+    // vscp_convertEventExToJSON(strEvent, &pobj->m_feedEvent );
+    // duk_push_string(ctx, (const char *)strEvent.c_str());
+    // duk_json_decode(ctx, -1);
+    // duk_put_global_string(ctx, "vscp_feedevent");
 
     // Save client object as a global pointer
-    duk_push_pointer(ctx, (void *)pobj->m_pClientItem);
+    duk_push_pointer(ctx, (void *)pActionObj->m_pClientItem);
     duk_put_global_string(ctx, "vscp_controlobject");
 
     // Create VSCP client
-    pobj->m_pClientItem = new CClientItem();
-    vscp_clearVSCPFilter(&pobj->m_pClientItem->m_filter);
+    pActionObj->m_pClientItem = new CClientItem();
+    vscp_clearVSCPFilter(&pActionObj->m_pClientItem->m_filter);
 
     // Save the client object as a global pointer
-    duk_push_pointer(ctx, (void *)pobj->m_pClientItem);
+    duk_push_pointer(ctx, (void *)pActionObj->m_pClientItem);
     duk_put_global_string(ctx, "vscp_clientitem");
 
     // reading [global object].vscp_clientItem
@@ -188,30 +184,30 @@ actionJavascriptThread(void *pData)
     //duk_bool_t rc;
 
     // This is an active client
-    pobj->m_pClientItem->m_bOpen = false;
-    pobj->m_pClientItem->m_type  = CLIENT_ITEM_INTERFACE_TYPE_CLIENT_JAVASCRIPT;
-    pobj->m_pClientItem->setDeviceName(
+    pActionObj->m_pClientItem->m_bOpen = false;
+    pActionObj->m_pClientItem->m_type  = CLIENT_ITEM_INTERFACE_TYPE_CLIENT_JAVASCRIPT;
+    pActionObj->m_pClientItem->setDeviceName(
       std::string("Internal daemon JavaScript client."));
 
     // Add the client to the Client List
-    pthread_mutex_lock(&gpobj->m_clientList.m_mutexItemList);
-    if (!gpobj->addClient(pobj->m_pClientItem)) {
+    pthread_mutex_lock(&pObj->m_mutex_clientList);
+    if (!pObj->m_clientList.addClient(pActionObj->m_pClientItem)) {
         // Failed to add client
-        delete pobj->m_pClientItem;
-        pobj->m_pClientItem = NULL;
-        pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
+        delete pActionObj->m_pClientItem;
+        pActionObj->m_pClientItem = NULL;
+        pthread_mutex_unlock(&pObj->m_mutex_clientList);
         syslog(LOG_ERR,
                "[Javascript execution] - Failed to add client. "
                "Terminating thread.");
         return NULL;
     }
-    pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pObj->m_mutex_clientList);
 
     // Open the channel
-    pobj->m_pClientItem->m_bOpen = true;
+    pActionObj->m_pClientItem->m_bOpen = true;
 
     // Execute the JavaScript
-    duk_push_string(ctx, (const char *)pobj->m_strScript.c_str());
+    duk_push_string(ctx, (const char *)pActionObj->m_strScript.c_str());
     if (0 != duk_peval(ctx)) {
         syslog(LOG_ERR,
                "[Javascript execution] - JavaScript failed to execute: %s",
@@ -224,18 +220,18 @@ actionJavascriptThread(void *pData)
     duk_pop(ctx); // pop eval. result
 
     // Close the channel
-    pobj->m_pClientItem->m_bOpen = false;
+    pActionObj->m_pClientItem->m_bOpen = false;
 
     // Remove client and session item
-    pthread_mutex_lock(&gpobj->m_clientList.m_mutexItemList);
-    gpobj->removeClient(pobj->m_pClientItem);
-    pobj->m_pClientItem = NULL;
-    pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
+    pthread_mutex_lock(&pObj->m_mutex_clientList);
+    pObj->m_clientList.removeClient(pActionObj->m_pClientItem);
+    pActionObj->m_pClientItem = NULL;
+    pthread_mutex_unlock(&pObj->m_mutex_clientList);
 
     // Destroy the JavaScript context
     duk_destroy_heap(ctx);
 
-    pobj->m_stop = vscpdatetime::Now(); // Mark stop time
+    pActionObj->m_stop = vscpdatetime::Now(); // Mark stop time
 
     return NULL;
 }

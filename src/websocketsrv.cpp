@@ -1,4 +1,4 @@
-// websocketserver.cpp
+// websocketsrv.cpp
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
@@ -78,8 +78,10 @@
 #include <vscp_debug.h>
 #include <vscphelper.h>
 #include <websrv.h>
+#include <websocketsrv.h>
 
-#include "websocket.h"
+
+//#include "websocket.h"
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
@@ -123,24 +125,28 @@ webserv_util_sendheader(struct mg_connection* nc,
 
 void
 ws1_command(struct mg_connection* conn,
-            struct websock_session* pSession,
-            std::string& strCmd);
+            websock_session* pSession,
+            std::string& strCmd,
+            void* cbdata);
 
 bool
 ws1_message(struct mg_connection* conn,
             websock_session* pSession,
-            std::string& strWsPkt);
+            std::string& strWsPkt,
+            void* cbdata);
 
 bool
 ws2_command(struct mg_connection* conn,
-            struct websock_session* pSession,
+            websock_session* pSession,
             std::string& strCmd,
-            json& obj);
+            json& obj,
+            void* cbdata);
 
 bool
 ws2_message(struct mg_connection* conn,
             websock_session* pSession,
-            std::string& strWsPkt);
+            std::string& strWsPkt,
+            void* cbdata);
 
 ///////////////////////////////////////////////////
 //                 WEBSOCKETS
@@ -148,7 +154,7 @@ ws2_message(struct mg_connection* conn,
 
 // Linked list of websocket sessions
 // Protected by the websocketSexxionMutex
-// static struct websock_session *gp_websock_sessions;
+// static websock_session *gp_websock_sessions;
 
 websock_session::websock_session(void)
 {
@@ -186,7 +192,7 @@ w2msg::~w2msg(void) {}
 
 bool
 websock_authentication(struct mg_connection* conn,
-                       struct websock_session* pSession,
+                       websock_session* pSession,
                        std::string& strIV,
                        std::string& strCrypto)
 {
@@ -225,7 +231,7 @@ websock_authentication(struct mg_connection* conn,
     }
 
     memset(buf, 0, sizeof(buf));
-    AES_CBC_decrypt_buffer(AES128, buf, secret, len, m_systemKey, iv);
+    AES_CBC_decrypt_buffer(AES128, buf, secret, len, pSession->m_pParent->m_systemKey, iv);
 
     std::string str = std::string((const char*)buf);
     std::deque<std::string> tokens;
@@ -256,7 +262,7 @@ websock_authentication(struct mg_connection* conn,
     vscp_trim(strPassword);
 
     // Check if user is valid
-    CUserItem* pUserItem = gpobj->m_userList.getUser(strUser);
+    CUserItem* pUserItem = pSession->m_pParent->m_userList.getUser(strUser);
     if (NULL == pUserItem) {
         syslog(LOG_ERR,
                "[Websocket Client] Authentication: CUserItem "
@@ -377,21 +383,21 @@ websock_new_session(const struct mg_connection* conn)
     pSession->m_pClientItem->m_strDeviceName = ("Internal websocket client.");
 
     // Add the client to the Client List
-    pthread_mutex_lock(&m_clientList.m_mutexItemList);
-    if (!gpobj->addClient(pSession->m_pClientItem)) {
+    pthread_mutex_lock(&pSession->m_pParent->m_clientList.m_mutexItemList);
+    if (!pSession->m_pParent->m_clientList.addClient(pSession->m_pClientItem)) {
         // Failed to add client
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
-        pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+        pthread_mutex_unlock(&pSession->m_pParent->m_clientList.m_mutexItemList);
         syslog(LOG_ERR,
                ("Websocket server: Failed to add client. Terminating thread."));
         return NULL;
     }
-    pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pSession->m_pParent->m_clientList.m_mutexItemList);
 
-    pthread_mutex_lock(&gpobj->m_mutex_websocketSession);
-    gpobj->m_websocketSessions.push_back(pSession);
-    pthread_mutex_unlock(&gpobj->m_mutex_websocketSession);
+    pthread_mutex_lock(&pSession->m_pParent->m_mutex_websocketSession);
+    pSession->m_pParent->m_websocketSessions.push_back(pSession);
+    pthread_mutex_unlock(&pSession->m_pParent->m_mutex_websocketSession);
 
     // Use the session object as user data
     mg_set_user_connection_data(pSession->m_conn, (void*)pSession);
@@ -426,7 +432,7 @@ websock_sendevent(struct mg_connection* conn,
         return false;
     }
 
-    return gpobj->sendEvent(pSession->m_pClientItem, pex );
+    return pSession->m_pParent->sendEvent(pex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -434,13 +440,13 @@ websock_sendevent(struct mg_connection* conn,
 //
 
 void
-websock_post_incomingEvents(void)
+websock_post_incomingEvents(const websock_session* pSession)
 {
-    pthread_mutex_lock(&gpobj->m_mutex_websocketSession);
+    pthread_mutex_lock(&pSession->m_pParent->m_mutex_websocketSession);
 
     std::list<websock_session*>::iterator iter;
-    for (iter = gpobj->m_websocketSessions.begin();
-         iter != gpobj->m_websocketSessions.end();
+    for (iter = pSession->m_pParent->m_websocketSessions.begin();
+         iter != pSession->m_pParent->m_websocketSessions.end();
          ++iter) {
 
         websock_session* pSession = *iter;
@@ -484,12 +490,9 @@ websock_post_incomingEvents(void)
 
                     std::string str;
                     if (vscp_convertEventToString(str, pEvent)) {
-
-                        if (__VSCP_DEBUG_WEBSOCKET_RX) {
-                            syslog(LOG_DEBUG,
+                        syslog(LOG_DEBUG,
                                    "Received ws event %s",
                                    str.c_str());
-                        }
 
                         // Write it out
                         if (WS_TYPE_1 == pSession->m_wstypes) {
@@ -521,7 +524,7 @@ websock_post_incomingEvents(void)
 
     } // for
 
-    pthread_mutex_unlock(&gpobj->m_mutex_websocketSession);
+    pthread_mutex_unlock(&pSession->m_pParent->m_mutex_websocketSession);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -533,6 +536,11 @@ ws1_connectHandler(const struct mg_connection* conn, void* cbdata)
 {
     struct mg_context* ctx = mg_get_context(conn);
     int reject             = 1;
+
+    if (NULL != conn);
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
 
     // Check pointers
     if (NULL == conn)
@@ -552,11 +560,9 @@ ws1_connectHandler(const struct mg_connection* conn, void* cbdata)
 
     mg_unlock_context(ctx);
 
-    if (__VSCP_DEBUG_WEBSOCKET) {
-        syslog(LOG_ERR,
+    syslog(LOG_ERR,
                "[Websocket ws1] WS1 Connection: client %s",
                (reject ? "rejected" : "accepted"));
-    }
 
     return reject;
 }
@@ -572,15 +578,14 @@ ws1_closeHandler(const struct mg_connection* conn, void* cbdata)
     websock_session* pSession =
       (websock_session*)mg_get_user_connection_data(conn);
 
-    if (NULL == conn)
-        return;
-    if (NULL == pSession)
-        return;
-    if (pSession->m_conn != conn)
-        return;
-    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED)
-        return;
+    if (NULL == conn) return;
+    if (NULL == pSession) return;
+    if (pSession->m_conn != conn) return;
+    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED) return;
+    if (NULL == cbdata) return;
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+     
     mg_lock_context(ctx);
 
     // Record activity
@@ -588,14 +593,14 @@ ws1_closeHandler(const struct mg_connection* conn, void* cbdata)
 
     pSession->m_conn_state = WEBSOCK_CONN_STATE_NULL;
     pSession->m_conn       = NULL;
-    m_clientList.removeClient(pSession->m_pClientItem);
+    pSession->m_pParent->m_clientList.removeClient(pSession->m_pClientItem);
     pSession->m_pClientItem = NULL;
 
-    pthread_mutex_lock(&gpobj->m_mutex_websocketSession);
+    pthread_mutex_lock(&pSession->m_pParent->m_mutex_websocketSession);
     // Remove session
-    gpobj->m_websocketSessions.remove(pSession);
+    pSession->m_pParent->m_websocketSessions.remove(pSession);
     delete pSession;
-    pthread_mutex_unlock(&gpobj->m_mutex_websocketSession);
+    pthread_mutex_unlock(&pSession->m_pParent->m_mutex_websocketSession);
 
     mg_unlock_context(ctx);
 }
@@ -610,15 +615,15 @@ ws1_readyHandler(struct mg_connection* conn, void* cbdata)
     websock_session* pSession =
       (websock_session*)mg_get_user_connection_data(conn);
 
+
     // Check pointers
-    if (NULL == conn)
-        return;
-    if (NULL == pSession)
-        return;
-    if (pSession->m_conn != conn)
-        return;
-    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED)
-        return;
+    if (NULL == conn) return;
+    if (NULL == pSession) return;
+    if (pSession->m_conn != conn) return;
+    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED) return;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return;    
 
     // Record activity
     pSession->lastActiveTime = time(NULL);
@@ -649,14 +654,14 @@ ws1_dataHandler(struct mg_connection* conn,
       (websock_session*)mg_get_user_connection_data(conn);
 
     // Check pointers
-    if (NULL == conn)
-        return WEB_ERROR;
-    if (NULL == pSession)
-        return WEB_ERROR;
-    if (pSession->m_conn != conn)
-        return WEB_ERROR;
-    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED)
-        return WEB_ERROR;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == pSession) return WEB_ERROR;
+    if (pSession->m_conn != conn) return WEB_ERROR;
+    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    
 
     // Record activity
     pSession->lastActiveTime = time(NULL);
@@ -664,10 +669,7 @@ ws1_dataHandler(struct mg_connection* conn,
     switch (((unsigned char)bits) & 0x0F) {
 
         case MG_WEBSOCKET_OPCODE_CONTINUATION:
-
-            if (__VSCP_DEBUG_WEBSOCKET_RX) {
-                syslog(LOG_DEBUG, "Websocket WS1 - opcode = Continuation");
-            }
+            syslog(LOG_DEBUG, "Websocket WS1 - opcode = Continuation");
 
             // Save and concatenate mesage
             pSession->m_strConcatenated += std::string(data, len);
@@ -677,7 +679,8 @@ ws1_dataHandler(struct mg_connection* conn,
                 try {
                     if (!ws1_message(conn,
                                      pSession,
-                                     pSession->m_strConcatenated)) {
+                                     pSession->m_strConcatenated,
+                                     cbdata)) {
                         return WEB_ERROR;
                     }
                 }
@@ -690,15 +693,13 @@ ws1_dataHandler(struct mg_connection* conn,
 
         // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
         case MG_WEBSOCKET_OPCODE_TEXT:
-            if (__VSCP_DEBUG_WEBSOCKET_RX) {
-                syslog(LOG_DEBUG,
+            syslog(LOG_DEBUG,
                        "Websocket WS1 - opcode = text[%s]",
                        strWsPkt.c_str());
-            }
             if (1 & bits) {
                 try {
                     strWsPkt = std::string(data, len);
-                    if (!ws1_message(conn, pSession, strWsPkt)) {
+                    if (!ws1_message(conn, pSession, strWsPkt, cbdata)) {
                         return WEB_ERROR;
                     }
                 }
@@ -713,28 +714,20 @@ ws1_dataHandler(struct mg_connection* conn,
             break;
 
         case MG_WEBSOCKET_OPCODE_BINARY:
-            if (__VSCP_DEBUG_WEBSOCKET_RX) {
-                syslog(LOG_DEBUG, "Websocket WS1 - opcode = BINARY");
-            }
+            syslog(LOG_DEBUG, "Websocket WS1 - opcode = BINARY");
             break;
 
         case MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE:
-            if (__VSCP_DEBUG_WEBSOCKET) {
-                syslog(LOG_DEBUG, "Websocket WS1 - opcode = Connection close");
-            }
+            syslog(LOG_DEBUG, "Websocket WS1 - opcode = Connection close");
             break;
 
         case MG_WEBSOCKET_OPCODE_PING:
-            if (__VSCP_DEBUG_WEBSOCKET_PING) {
-                syslog(LOG_DEBUG, "Websocket WS1 - Ping received/Pong sent,");
-            }
+            syslog(LOG_DEBUG, "Websocket WS1 - Ping received/Pong sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PONG, NULL, 0);
             break;
 
         case MG_WEBSOCKET_OPCODE_PONG:
-            if (__VSCP_DEBUG_WEBSOCKET_PING) {
-                syslog(LOG_DEBUG, "Websocket WS2 - Pong received/Pung sent,");
-            }
+            syslog(LOG_DEBUG, "Websocket WS2 - Pong received/Pung sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PING, NULL, 0);
             break;
 
@@ -752,15 +745,17 @@ ws1_dataHandler(struct mg_connection* conn,
 bool
 ws1_message(struct mg_connection* conn,
             websock_session* pSession,
-            std::string& strWsPkt)
+            std::string& strWsPkt,
+            void* cbdata)
 {
     std::string str;
 
     // Check pointer
-    if (NULL == conn)
-        return false;
-    if (NULL == pSession)
-        return false;
+    if (NULL == conn) return false;
+    if (NULL == pSession) return false;
+    if (NULL == cbdata) return false;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     vscp_trim(strWsPkt);
 
@@ -771,7 +766,7 @@ ws1_message(struct mg_connection* conn,
             // Point beyond initial info "C;"
             strWsPkt = vscp_str_right(strWsPkt, strWsPkt.length() - 2);
             try {
-                ws1_command(conn, pSession, strWsPkt);
+                ws1_command(conn, pSession, strWsPkt, cbdata);
             }
             catch (...) {
                 syslog(LOG_ERR, "ws1: Exception occurred ws1_command");
@@ -981,11 +976,9 @@ ws1_message(struct mg_connection* conn,
                                            MG_WEBSOCKET_OPCODE_TEXT,
                                            "+;EVENT",
                                            7);
-                        if (__VSCP_DEBUG_WEBSOCKET_TX) {
-                            syslog(LOG_ERR,
+                        syslog(LOG_ERR,
                                    "[websocket ws1] Sent ws1 event %s",
                                    strWsPkt.c_str());
-                        }
                     }
                     else {
                         str = vscp_str_format(("-;%d;%s"),
@@ -1025,21 +1018,21 @@ ws1_message(struct mg_connection* conn,
 
 void
 ws1_command(struct mg_connection* conn,
-            struct websock_session* pSession,
-            std::string& strCmd)
+            websock_session* pSession,
+            std::string& strCmd,
+            void* cbdata)
 {
     std::string str; // Worker string
     std::string strTok;
 
     // Check pointer
-    if (NULL == conn)
-        return;
-    if (NULL == pSession)
-        return;
+    if (NULL == conn) return;
+    if (NULL == pSession) return;
+    if (NULL == cbdata) return;
 
-    if (__VSCP_DEBUG_WEBSOCKET) {
-        syslog(LOG_ERR, "[Websocket ws1] Command = %s", strCmd.c_str());
-    }
+    CWebObj *pObj = (CWebObj *)cbdata;    
+
+    syslog(LOG_ERR, "[Websocket ws1] Command = %s", strCmd.c_str());
 
     std::deque<std::string> tokens;
     vscp_split(tokens, strCmd, ";");
@@ -1363,7 +1356,7 @@ ws1_command(struct mg_connection* conn,
         std::string strvalue;
 
         std::string strResult = ("+;VERSION;");
-        strResult += VSCPD_DISPLAY_VERSION;
+        strResult += DISPLAY_VERSION;
         strResult += (";");
         strResult += vscp_str_format(("%d.%d.%d.%d"),
                                      MAJOR_VERSION,
@@ -1386,7 +1379,7 @@ ws1_command(struct mg_connection* conn,
         std::string strvalue;
 
         std::string strResult = ("+;COPYRIGHT;");
-        strResult += VSCPD_COPYRIGHT;
+        strResult += COPYRIGHT;
 
         // Positive reply
         mg_websocket_write(conn,
@@ -1403,12 +1396,12 @@ ws1_command(struct mg_connection* conn,
         std::string strGUID;
         std::string strResult = ("+;INTERFACES;");
  
-        // Display Interface List
-        pthread_mutex_lock(&m_clientList.m_mutexItemList);
+        // Protect client List
+        pthread_mutex_lock(&pSession->m_pParent->m_clientList.m_mutexItemList);
 
         std::deque<CClientItem*>::iterator it;
-        for (it = m_clientList.m_itemList.begin();
-            it != m_clientList.m_itemList.end();
+        for (it = pSession->m_pParent->m_clientList.m_itemList.begin();
+            it != pSession->m_pParent->m_clientList.m_itemList.end();
             ++it) {
 
             CClientItem* pItem = *it;
@@ -1425,7 +1418,7 @@ ws1_command(struct mg_connection* conn,
             strResult += std::string(";");
         }
 
-        pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+        pthread_mutex_unlock(&pSession->m_pParent->m_clientList.m_mutexItemList);
 
         // Positive reply
         mg_websocket_write(conn,
@@ -1443,7 +1436,7 @@ ws1_command(struct mg_connection* conn,
         std::string strResult = ("+;WCYD;");;
         uint8_t capabilities[8];
 
-        gpobj->getVscpCapabilities(capabilities);
+        //pSession->m_pParent->getVscpCapabilities(capabilities);  // TODO
         strResult = vscp_str_format("%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
                                         capabilities[7],
                                         capabilities[6],
@@ -1477,10 +1470,11 @@ ws2_connectHandler(const struct mg_connection* conn, void* cbdata)
     int reject             = 1;
 
     // Check pointers
-    if (NULL == conn)
-        return 1;
-    if (NULL == ctx)
-        return 1;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == ctx) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_lock_context(ctx);
     websock_session* pSession = websock_new_session(conn);
@@ -1494,11 +1488,9 @@ ws2_connectHandler(const struct mg_connection* conn, void* cbdata)
 
     mg_unlock_context(ctx);
 
-    if (__VSCP_DEBUG_WEBSOCKET) {
-        syslog(LOG_ERR,
+    syslog(LOG_ERR,
                "[Websocket ws2] WS2 Connection: client %s",
                (reject ? "rejected" : "accepted"));
-    }
 
     return reject;
 }
@@ -1515,14 +1507,13 @@ ws2_closeHandler(const struct mg_connection* conn, void* cbdata)
     websock_session* pSession =
       (websock_session*)mg_get_user_connection_data(conn);
 
-    if (NULL == conn)
-        return;
-    if (NULL == pSession)
-        return;
-    if (pSession->m_conn != conn)
-        return;
-    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED)
-        return;
+    if (NULL == conn) return;
+    if (NULL == pSession) return;
+    if (pSession->m_conn != conn) return;
+    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED) return;
+    if (NULL == cbdata) return;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_lock_context(ctx);
 
@@ -1531,13 +1522,13 @@ ws2_closeHandler(const struct mg_connection* conn, void* cbdata)
 
     pSession->m_conn_state = WEBSOCK_CONN_STATE_NULL;
     pSession->m_conn       = NULL;
-    m_clientList.removeClient(pSession->m_pClientItem);
+    pSession->m_pParent->m_clientList.removeClient(pSession->m_pClientItem);
     pSession->m_pClientItem = NULL;
 
-    pthread_mutex_lock(&gpobj->m_mutex_websocketSession);
-    gpobj->m_websocketSessions.remove(pSession);
+    pthread_mutex_lock(&pSession->m_pParent->m_mutex_websocketSession);
+    pSession->m_pParent->m_websocketSessions.remove(pSession);
     delete pSession;
-    pthread_mutex_unlock(&gpobj->m_mutex_websocketSession);
+    pthread_mutex_unlock(&pSession->m_pParent->m_mutex_websocketSession);
 
     mg_unlock_context(ctx);
 }
@@ -1559,15 +1550,14 @@ ws2_readyHandler(struct mg_connection* conn, void* cbdata)
       (websock_session*)mg_get_user_connection_data(conn);
 
     // Check pointers
-    if (NULL == conn)
-        return;
-    if (NULL == pSession)
-        return;
-    if (pSession->m_conn != conn)
-        return;
-    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED)
-        return;
+    if (NULL == conn) return;
+    if (NULL == pSession) return;
+    if (pSession->m_conn != conn) return;
+    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED) return;
+    if (NULL == cbdata) return;
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+    
     // Record activity
     pSession->lastActiveTime = time(NULL);
 
@@ -1603,15 +1593,14 @@ ws2_dataHandler(struct mg_connection* conn,
       (websock_session*)mg_get_user_connection_data(conn);
 
     // Check pointers
-    if (NULL == conn)
-        return WEB_ERROR;
-    if (NULL == pSession)
-        return WEB_ERROR;
-    if (pSession->m_conn != conn)
-        return WEB_ERROR;
-    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED)
-        return WEB_ERROR;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == pSession) return WEB_ERROR;
+    if (pSession->m_conn != conn) return WEB_ERROR;
+    if (pSession->m_conn_state < WEBSOCK_CONN_STATE_CONNECTED) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+    
     // Record activity
     pSession->lastActiveTime = time(NULL);
 
@@ -1619,9 +1608,7 @@ ws2_dataHandler(struct mg_connection* conn,
 
         case MG_WEBSOCKET_OPCODE_CONTINUATION:
 
-            if (__VSCP_DEBUG_WEBSOCKET) {
-                syslog(LOG_DEBUG, "Websocket WS2 - opcode = Continuation");
-            }
+            syslog(LOG_DEBUG, "Websocket WS2 - opcode = Continuation");
 
             // Save and concatenate mesage
             pSession->m_strConcatenated += std::string(data, len);
@@ -1631,7 +1618,8 @@ ws2_dataHandler(struct mg_connection* conn,
                 try {
                     if (!ws2_message(conn,
                                      pSession,
-                                     pSession->m_strConcatenated)) {
+                                     pSession->m_strConcatenated,
+                                     cbdata)) {
                         return WEB_ERROR;
                     }
                 }
@@ -1645,16 +1633,14 @@ ws2_dataHandler(struct mg_connection* conn,
         // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
         case MG_WEBSOCKET_OPCODE_TEXT:
 
-            if (__VSCP_DEBUG_WEBSOCKET) {
-                syslog(LOG_DEBUG,
+            syslog(LOG_DEBUG,
                        "Websocket WS2 - opcode = Text [%s]",
                        strWsPkt.c_str());
-            }
 
             if (1 & bits) {
                 try {
                     strWsPkt = std::string(data, len);
-                    if (!ws2_message(conn, pSession, strWsPkt)) {
+                    if (!ws2_message(conn, pSession, strWsPkt, cbdata)) {
                         return WEB_ERROR;
                     }
                 }
@@ -1669,28 +1655,20 @@ ws2_dataHandler(struct mg_connection* conn,
             break;
 
         case MG_WEBSOCKET_OPCODE_BINARY:
-            if (__VSCP_DEBUG_WEBSOCKET) {
-                syslog(LOG_DEBUG, "Websocket WS2 - opcode = BINARY");
-            }
+            syslog(LOG_DEBUG, "Websocket WS2 - opcode = BINARY");
             break;
 
         case MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE:
-            if (__VSCP_DEBUG_WEBSOCKET) {
-                syslog(LOG_DEBUG, "Websocket WS2 - Connection close");
-            }
+            syslog(LOG_DEBUG, "Websocket WS2 - Connection close");
             break;
 
         case MG_WEBSOCKET_OPCODE_PING:
-            if (__VSCP_DEBUG_WEBSOCKET_PING) {
-                syslog(LOG_DEBUG, "Websocket WS2 - Ping received/Pong sent,");
-            }
+            syslog(LOG_DEBUG, "Websocket WS2 - Ping received/Pong sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PONG, data, len);
             break;
 
         case MG_WEBSOCKET_OPCODE_PONG:
-            if (__VSCP_DEBUG_WEBSOCKET_PING) {
-                syslog(LOG_DEBUG, "Websocket WS2 - Pong received/Ping sent,");
-            }
+            syslog(LOG_DEBUG, "Websocket WS2 - Pong received/Ping sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PING, data, len);
             break;
 
@@ -1708,19 +1686,19 @@ ws2_dataHandler(struct mg_connection* conn,
 bool
 ws2_message(struct mg_connection* conn,
             websock_session* pSession,
-            std::string& strWsPkt)
+            std::string& strWsPkt,
+            void* cbdata)
 {
     w2msg msg;
     std::string str;
     json json_obj; // Command obj, event obj etc
 
     // Check pointer
-    if (NULL == conn) {
-        return false;
-    }
-    if (NULL == pSession) {
-        return false;
-    }
+    if (NULL == conn) return false;
+    if (NULL == pSession) return false;
+    if (NULL == cbdata) return false;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     /*
     {
@@ -1758,7 +1736,8 @@ ws2_message(struct mg_connection* conn,
                             return ws2_command(conn,
                                                pSession,
                                                strCmd,
-                                               it.value());
+                                               it.value(),
+                                               cbdata);
                         }
                     }
 
@@ -1993,11 +1972,9 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    if (__VSCP_DEBUG_WEBSOCKET_TX) {
-                                        syslog(LOG_ERR,
+                                    syslog(LOG_ERR,
                                                "Sent ws2 event %s",
                                                strWsPkt.c_str());
-                                    }
                                 }
                                 else {
 
@@ -2173,21 +2150,19 @@ ws2_message(struct mg_connection* conn,
 
 bool
 ws2_command(struct mg_connection* conn,
-            struct websock_session* pSession,
+            websock_session* pSession,
             std::string& strCmd,
-            json& jsonObj)
+            json& jsonObj,
+            void* cbdata)
 {
     // Check pointer
-    if (NULL == conn) {
-        return false;
-    }
-    if (NULL == pSession) {
-        return false;
-    }
+    if (NULL == conn) return false;
+    if (NULL == pSession) return false;
+    if (NULL == cbdata) return WEB_ERROR;
 
-    if (__VSCP_DEBUG_WEBSOCKET) {
-        syslog(LOG_DEBUG, "[Websocket ws2] Command = %s", strCmd.c_str());
-    }
+    CWebObj *pObj = (CWebObj *)cbdata;
+
+    syslog(LOG_DEBUG, "[Websocket ws2] Command = %s", strCmd.c_str());
 
     // Get arguments
     std::map<std::string, std::string> argmap;
@@ -2500,10 +2475,10 @@ ws2_command(struct mg_connection* conn,
 
         std::string strResult;
         strResult = vscp_str_format("[%d,%d,%d,%d]",
-                                    VSCPD_MAJOR_VERSION,
-                                    VSCPD_MINOR_VERSION,
-                                    VSCPD_RELEASE_VERSION,
-                                    VSCPD_BUILD_VERSION);
+                                    MAJOR_VERSION,
+                                    MINOR_VERSION,
+                                    RELEASE_VERSION,
+                                    BUILD_VERSION);
         // Positive reply
         std::string str = vscp_str_format(WS2_POSITIVE_RESPONSE,
                                           strCmd.c_str(),
@@ -2523,7 +2498,7 @@ ws2_command(struct mg_connection* conn,
         std::string strvalue;
 
         std::string strResult = ("[ \"copyright\" : \"");
-        strResult += VSCPD_COPYRIGHT;
+        strResult += COPYRIGHT;
         strResult += "\" ]";
 
         // Positive reply
@@ -2547,11 +2522,11 @@ ws2_command(struct mg_connection* conn,
         std::deque<std::string> iflist;
 
         // Display Interface List
-        pthread_mutex_lock(&m_clientList.m_mutexItemList);
+        pthread_mutex_lock(&pSession->m_pParent->m_clientList.m_mutexItemList);
 
         std::deque<CClientItem*>::iterator it;
-        for (it = m_clientList.m_itemList.begin();
-            it != m_clientList.m_itemList.end();
+        for (it = pSession->m_pParent->m_clientList.m_itemList.begin();
+            it != pSession->m_pParent->m_clientList.m_itemList.end();
             ++it) {
 
             CClientItem* pItem = *it;
@@ -2569,7 +2544,7 @@ ws2_command(struct mg_connection* conn,
             iflist.push_back(str);
         }
 
-        pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+        pthread_mutex_unlock(&pSession->m_pParent->m_clientList.m_mutexItemList);
 
         json j;
         j["type"] = "+";
@@ -2591,7 +2566,7 @@ ws2_command(struct mg_connection* conn,
         std::string strResult;
         uint8_t capabilities[8];
 
-        gpobj->getVscpCapabilities(capabilities);
+        //pSession->m_pParent->getVscpCapabilities(capabilities); TODO
         strResult = vscp_str_format("%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
                                         capabilities[7],
                                         capabilities[6],
@@ -2630,21 +2605,21 @@ ws2_command(struct mg_connection* conn,
 
 void
 ws2_xcommand(struct mg_connection* conn,
-             struct websock_session* pSession,
-             std::string& strCmd)
+             websock_session* pSession,
+             std::string& strCmd,
+             void *cbdata)
 {
     std::string str; // Worker string
     std::string strTok;
 
     // Check pointer
-    if (NULL == conn)
-        return;
-    if (NULL == pSession)
-        return;
+    if (NULL == conn) return;
+    if (NULL == pSession) return;
+    if (NULL == cbdata) return;
 
-    if (__VSCP_DEBUG_WEBSOCKET) {
-        syslog(LOG_ERR, "[Websocket ws2] Command = %s", strCmd.c_str());
-    }
+    CWebObj *pObj = (CWebObj *)cbdata;
+
+    syslog(LOG_ERR, "[Websocket ws2] Command = %s", strCmd.c_str());
 
     std::deque<std::string> tokens;
     vscp_split(tokens, strCmd, ";");

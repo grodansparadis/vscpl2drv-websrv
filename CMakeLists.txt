@@ -198,24 +198,39 @@ set(RESOURCE_FILES
 # Add files to library
 add_library(vscpl2drv-websock
     ./src/vscpl2drv-websock.cpp
-    ./src/websockobj.cpp
-    ${VSCP_PATH}/src/vscp/common/websocketsrv.cpp
+    ./src/webobj.h
+    ./src/webobj.cpp
+    ./src/websocketsrv.h
+    ./src/websocketsrv.cpp
+    ./src/web_template.h
+    ./src/web_js.h
+    ./src/web_css.h
+    ./src/websrv.h
+    ./src/websrv.cpp
+    ./src/lua_vscp_func.h
+    ./src/lua_vscp_func.cpp
+    ./src/lua_vscp_wrkthread.h
+    ./src/lua_vscp_wrkthread.cpp
+    ./src/restsrv.h
+    ./src/restsrv.cpp
+    ./src/duktape_vscp_func.h
+    ./src/duktape_vscp_func.cpp
+    ./src/duktape_vscp_wrkthread.h
+    ./src/duktape_vscp_wrkthread.cpp
     ${VSCP_PATH}/src/vscp/common/userlist.h
     ${VSCP_PATH}/src/vscp/common/userlist.cpp
     ${VSCP_PATH}/src/vscp/common/clientlist.h
-    ${VSCP_PATH}/src/vscp/common/clientlist.cpp
-    ${VSCP_PATH}/src/vscp/common/web_template.h
-    ${VSCP_PATH}/src/vscp/common/web_js.h
-    ${VSCP_PATH}/src/vscp/common/web_css.h
-    ${VSCP_PATH}/src/vscp/common/websrv.h
-    ${VSCP_PATH}/src/vscp/common/websrv.cpp
-    ${VSCP_PATH}/src/vscp/common/lua_vscp_func.h
-    ${VSCP_PATH}/src/vscp/common/lua_vscp_func.cpp
-    ${VSCP_PATH}/src/vscp/common/lua_vscp_wrkthread.h
-    ${VSCP_PATH}/src/vscp/common/lua_vscp_wrkthread.cpp
+    ${VSCP_PATH}/src/vscp/common/clientlist.cpp    
     ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/civetweb.c
     ${VSCP_PATH}/src/common/third_party/mustache.hpp
-    ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include    
+    ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
+    ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/duktape.c 
+    ${VSCP_PATH}/src/common/third_party/sqlite3-3.35.4/sqlite3.c
+    ${VSCP_PATH}/src/common/third_party/lsqlite3.c
+    ${VSCP_PATH}/src/common/third_party/sqlite3math.c
+    ${VSCP_PATH}/src/common/third_party/lfs.c
+    ${VSCP_PATH}/src/common/third_party/LuaXML_lib.c
+    ${VSCP_PATH}/src/common/third_party/lua_all.c
     ${VSCP_PATH}/src/vscp/common/vscp.h
     ${VSCP_PATH}/src/vscp/common/vscpremotetcpif.h
     ${VSCP_PATH}/src/vscp/common/vscpremotetcpif.cpp
@@ -254,7 +269,11 @@ if (WIN32)
         ${VSCP_PATH}/src/common/third_party
         ${VSCP_PATH}/src/common/third_party/nlohmann
         ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src
         ${VSCP_PATH}/src/common/third_party/civetweb-1.14/include
+        ${VSCP_PATH}/src/common/third_party/lua-5.4.3/
+	    ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/
+	    ${VSCP_PATH}/src/common/third_party/sqlite3-3.35.4/ 
         ${PThreads4W_INCLUDE_DIR}
         ${CMAKE_BINARY_DIR}
         ${OPENSSL_INCLUDE_DIR}
@@ -267,7 +286,11 @@ else()
         ${VSCP_PATH}/src/common/third_party
         ${VSCP_PATH}/src/common/third_party/nlohmann
         ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src
         ${VSCP_PATH}/src/common/third_party/civetweb-1.14/include
+        ${VSCP_PATH}/src/common/third_party/lua-5.4.3/
+	    ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/
+	    ${VSCP_PATH}/src/common/third_party/sqlite3-3.35.4/ 
         ${CMAKE_BINARY_DIR}
         ${OPENSSL_INCLUDE_DIR}
         ${LOCAL_SYSLOG_INCLUDE} )

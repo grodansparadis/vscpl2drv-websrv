@@ -39,13 +39,13 @@
 #include <json.hpp> // Needs C++11  -std=c++11
 
 #include <actioncodes.h>
-#include <controlobject.h>
 #include <userlist.h>
 #include <version.h>
 #include <vscp.h>
 #include <vscpdb.h>
 #include <vscphelper.h>
-#include <vscpremotetcpif.h>
+#include <webobj.h>
+//#include <vscpremotetcpif.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -66,11 +66,6 @@ extern "C"
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
 
-///////////////////////////////////////////////////
-//                   GLOBALS
-///////////////////////////////////////////////////
-
-extern CControlObject* gpobj;
 
 ///////////////////////////////////////////////////////////////////////////////
 // web_lsp_md5
@@ -1067,14 +1062,14 @@ lua_vscp_sendEvent(struct lua_State* L)
     int format = 0;
     vscpEventEx ex;
     std::string strEvent;
-    CClientItem* pClientItem = NULL;
+    CWebObj* pObj = NULL;
 
     int nArgs = lua_gettop(L);
 
     // Get the client item
-    lua_pushlstring(L, "vscp_clientitem", 15);
+    lua_pushlstring(L, "vscp_webobj", 15);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    pClientItem = (CClientItem*)lua_touserdata(L, -1);
+    pObj = (CWebObj*)lua_touserdata(L, -1);
 
     nArgs = lua_gettop(L);
 
@@ -1083,7 +1078,7 @@ lua_vscp_sendEvent(struct lua_State* L)
 
     nArgs = lua_gettop(L);
 
-    if (NULL == pClientItem) {
+    if (NULL == pObj) {
         return luaL_error(L, "vscp.sendEvent: VSCP server client not found.");
     }
 
@@ -1150,14 +1145,13 @@ lua_vscp_sendEvent(struct lua_State* L)
     pEvent->pdata = NULL;
     vscp_convertEventExToEvent(pEvent, &ex);
 
-    if (!gpobj->sendEvent(pClientItem, pEvent)) {
+    if (!pObj->sendEvent(pEvent)) {
         // Failed to send event
         vscp_deleteEvent_v2(&pEvent);
         return luaL_error(L, "vscp.sendEvent: Failed to send event!");
     }
 
     vscp_deleteEvent_v2(&pEvent);
-
     return 1;
 }
 
@@ -1173,7 +1167,7 @@ lua_vscp_getEvent(struct lua_State* L)
     int format = 0;
     //vscpEventEx ex;
     std::string strEvent;
-    CClientItem* pClientItem = NULL;
+    CWebObj* pObj = NULL;
 
     int nArgs = lua_gettop(L);
 
@@ -1186,29 +1180,29 @@ lua_vscp_getEvent(struct lua_State* L)
     }
 
     // Get the client item
-    lua_pushlstring(L, "vscp_clientitem", 15);
+    lua_pushlstring(L, "vscp_webobj", 15);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    pClientItem = (CClientItem*)lua_touserdata(L, -1);
+    pObj = (CWebObj*)lua_touserdata(L, -1);
 
-    if (NULL == pClientItem) {
+    if (NULL == pObj) {
         return luaL_error(L, "vscp.getEvent: VSCP server client not found.");
     }
 
 //try_again:
 
     // Check the client queue
-    if (pClientItem->m_bOpen && pClientItem->m_clientInputQueue.size()) {
+    if (/*pObj->m_bOpen && TODO */pObj->m_receiveList.size()) {
 
         std::deque<vscpEvent*>::iterator it;
         vscpEvent* pEvent;
 
-        pthread_mutex_lock(&pClientItem->m_mutexClientInputQueue);
-        pEvent = pClientItem->m_clientInputQueue.front();
-        pClientItem->m_clientInputQueue.pop_front();
+        pthread_mutex_lock(&pObj->m_mutexReceiveQueue);
+        pEvent = pObj->m_receiveList.front();
+        pObj->m_receiveList.pop_front();
         if (NULL == pEvent) {
             return luaL_error(L, "vscp.getEvent: Failed to get event.");
         }
-        pthread_mutex_unlock(&pClientItem->m_mutexClientInputQueue);
+        pthread_mutex_unlock(&pObj->m_mutexReceiveQueue);
 
         if (NULL == pEvent) {
             return luaL_error(L,
@@ -1216,46 +1210,47 @@ lua_vscp_getEvent(struct lua_State* L)
                               "getting event from client!");
         }
 
-        if (vscp_doLevel2Filter(pEvent, &pClientItem->m_filter)) {
+        // TODO
+        // if (vscp_doLevel2Filter(pEvent, &pObj->m_filter)) {
 
-            // Write it out
-            std::string strResult;
-            switch (format) {
-                case 0: // String
-                    if (!vscp_convertEventToString(strResult, pEvent)) {
-                        return luaL_error(L,
-                                          "vscp.getEvent: Failed to "
-                                          "convert event to string form.");
-                    }
-                    break;
+        //     // Write it out   
+        //     std::string strResult;
+        //     switch (format) {
+        //         case 0: // String
+        //             if (!vscp_convertEventToString(strResult, pEvent)) {
+        //                 return luaL_error(L,
+        //                                   "vscp.getEvent: Failed to "
+        //                                   "convert event to string form.");
+        //             }
+        //             break;
 
-                case 1: // XML
-                    if (!vscp_convertEventToXML(strResult, pEvent)) {
-                        return luaL_error(L,
-                                          "vscp.getEvent: Failed to "
-                                          "convert event to XML form.");
-                    }
-                    break;
+        //         case 1: // XML
+        //             if (!vscp_convertEventToXML(strResult, pEvent)) {
+        //                 return luaL_error(L,
+        //                                   "vscp.getEvent: Failed to "
+        //                                   "convert event to XML form.");
+        //             }
+        //             break;
 
-                case 2: // JSON
-                    if (!vscp_convertEventToJSON(strResult, pEvent)) {
-                        return luaL_error(L,
-                                          "vscp.getEvent: Failed to "
-                                          "convert event to JSON form.");
-                    }
-                    break;
-            }
+        //         case 2: // JSON
+        //             if (!vscp_convertEventToJSON(strResult, pEvent)) {
+        //                 return luaL_error(L,
+        //                                   "vscp.getEvent: Failed to "
+        //                                   "convert event to JSON form.");
+        //             }
+        //             break;
+        //     }
 
-            // Event is not needed anymore
-            vscp_deleteEvent(pEvent);
+        //     // Event is not needed anymore
+        //     vscp_deleteEvent(pEvent);
 
-            lua_pushlstring(
-              L, (const char*)strResult.c_str(), strResult.length());
+        //     lua_pushlstring(
+        //       L, (const char*)strResult.c_str(), strResult.length());
 
-            // All OK return event
-            return 1;
+        //     // All OK return event
+        //     return 1;
 
-        } // Valid pEvent pointer
+        // } // Valid pEvent pointer
 
     } // events available
 
@@ -1274,23 +1269,22 @@ int
 lua_vscp_getCountEvent(struct lua_State* L)
 {
     int count = 0;
-    CClientItem* pClientItem = NULL;
+    CWebObj* pObj = NULL;
 
     // Get the client item
-    lua_pushlstring(L, "vscp_clientitem", 15);
+    lua_pushlstring(L, "vscp_webobj", 15);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    pClientItem = (CClientItem*)lua_touserdata(L, -1);
+    pObj = (CWebObj*)lua_touserdata(L, -1);
 
-    if (NULL == pClientItem) {
-        return luaL_error(L,
-                          "vscp.getCountEvent: VSCP server client not found.");
+    if (NULL == pObj) {
+        return luaL_error(L, "vscp.getCountEvent: VSCP server client not found.");
     }
 
-    if (pClientItem->m_bOpen) {
-        count = pClientItem->m_clientInputQueue.size();
-    } else {
-        count = 0;
-    }
+    // if (pObj->m_bOpen) {     TODO
+    //     count = pObj->m_receiveList.size();
+    // } else {
+    //     count = 0;
+    // }
 
     lua_pushinteger(L, count); // return count
 
@@ -1322,16 +1316,16 @@ lua_vscp_setFilter(struct lua_State* L)
     int format = 0;
     vscpEventFilter filter;
     std::string strFilter;
-    CClientItem* pClientItem = NULL;
+    CWebObj* pObj = NULL;
 
     int nArgs = lua_gettop(L);
 
     // Get the client item
-    lua_pushlstring(L, "vscp_clientitem", 15);
+    lua_pushlstring(L, "vscp_webobj", 15);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    pClientItem = (CClientItem*)lua_touserdata(L, -1);
+    pObj = (CWebObj*)lua_touserdata(L, -1);
 
-    if (NULL == pClientItem) {
+    if (NULL == pObj) {
         return luaL_error(L, "vscp.setFilter: VSCP server client not found.");
     }
 
@@ -1387,7 +1381,7 @@ lua_vscp_setFilter(struct lua_State* L)
     }
 
     // Set the filter
-    vscp_copyVSCPFilter(&pClientItem->m_filter, &filter);
+    //vscp_copyVSCPFilter(&pObj->m_filter, &filter);  TODO
 
     return 1;
 }
@@ -1409,7 +1403,7 @@ lua_vscp_setFilter(struct lua_State* L)
 int
 lua_send_Measurement(struct lua_State* L)
 {
-    CClientItem* pClientItem = NULL;
+    CWebObj* pObj = NULL;
     vscpEvent* pEvent;
     double value;         // Measurement value
     bool bLevel2 = true;  // True if level II
@@ -1424,11 +1418,11 @@ lua_send_Measurement(struct lua_State* L)
     int nArgs = lua_gettop(L);
 
     // Get the client item
-    lua_pushlstring(L, "vscp_clientitem", 15);
+    lua_pushlstring(L, "vscp_webobj", 15);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    pClientItem = (CClientItem*)lua_touserdata(L, -1);
+    pObj = (CWebObj*)lua_touserdata(L, -1);
 
-    if (NULL == pClientItem) {
+    if (NULL == pObj) {
         return luaL_error(
           L, "vscp.sendMeasurement: VSCP server client not found.");
     }
@@ -1648,13 +1642,13 @@ lua_send_Measurement(struct lua_State* L)
     }
 
     // Send the event
-    if (!gpobj->sendEvent(pClientItem, pEvent)) {
-        // Failed to send event
-        vscp_deleteEvent_v2(&pEvent);
-        return luaL_error(L,
-                          "vscp.sendMeasurement: "
-                          "Failed to send event!");
-    }
+    // if (!pObj->sendEvent(pObj, pEvent)) {  TODO
+    //     // Failed to send event
+    //     vscp_deleteEvent_v2(&pEvent);
+    //     return luaL_error(L,
+    //                       "vscp.sendMeasurement: "
+    //                       "Failed to send event!");
+    // }
 
     vscp_deleteEvent_v2(&pEvent);
 

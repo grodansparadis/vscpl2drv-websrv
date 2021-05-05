@@ -29,6 +29,8 @@
 #if !defined(VSCP_LUA__INCLUDED_)
 #define VSCP_LUA__INCLUDED_
 
+#include <vscpdatetime.h>
+
 ////////////////////////////////////////////////////////////////////////////////
 // actionLuaObj
 //
@@ -63,7 +65,7 @@ class actionLuaObj
     vscpdatetime m_stop;
 
     /// Client item for script
-    CClientItem *m_pClientItem;
+    //CClientItem *m_pClientItem;
 
     /// Feed event
     vscpEventEx m_feedEvent;

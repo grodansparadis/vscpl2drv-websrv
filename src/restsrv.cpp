@@ -68,15 +68,13 @@
 
 #include <actioncodes.h>
 #include <civetweb.h>
-#include <controlobject.h>
-#include <devicelist.h>
-#include <devicethread.h>
 #include <mdf.h>
 #include <version.h>
 #include <vscp.h>
 #include <vscp_aes.h>
 #include <vscp_debug.h>
 #include <vscphelper.h>
+#include <webobj.h>
 #include <websrv.h>
 
 #include "restsrv.h"
@@ -88,84 +86,90 @@ using json = nlohmann::json;
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-///////////////////////////////////////////////////
-//                 GLOBALS
-///////////////////////////////////////////////////
-
-extern CControlObject* gpobj;
-
 // Prototypes
 
 void
 restsrv_doStatus(struct mg_connection* conn,
                  struct restsrv_session* pSession,
-                 int format);
+                 int format,
+                 void *cbdata);
 
 void
 restsrv_doOpen(struct mg_connection* conn,
                struct restsrv_session* pSession,
-               int format);
+               int format,
+               void *cbdata);
 
 void
 restsrv_doClose(struct mg_connection* conn,
                 struct restsrv_session* pSession,
-                int format);
+                int format,
+                void *cbdata);
 
 void
 restsrv_doSendEvent(struct mg_connection* conn,
                     struct restsrv_session* pSession,
                     int format,
-                    vscpEvent* pEvent);
+                    vscpEvent* pEvent,
+                    void *cbdata);
 
 void
 restsrv_doReceiveEvent(struct mg_connection* conn,
                        struct restsrv_session* pSession,
                        int format,
-                       size_t count);
+                       size_t count,
+                       void *cbdata);
 
 void
 restsrv_doReceiveEvent(struct mg_connection* conn,
                        struct restsrv_session* pSession,
                        int format,
-                       size_t count);
+                       size_t count,
+                       void *cbdata);
 
 void
 restsrv_doSetFilter(struct mg_connection* conn,
                     struct restsrv_session* pSession,
                     int format,
-                    vscpEventFilter& vscpfilter);
+                    vscpEventFilter& vscpfilter,
+                    void *cbdata);
 
 void
 restsrv_doClearQueue(struct mg_connection* conn,
                      struct restsrv_session* pSession,
-                     int format);
+                     int format,
+                     void *cbdata);
 
 void
 restsrv_doListVariable(struct mg_connection* conn,
                        struct restsrv_session* pSession,
                        int format,
                        std::string& strRegEx,
-                       bool bShort);
+                       bool bShort,
+                       void *cbdata);
 
 void
 restsrv_doListVariable(struct mg_connection* conn,
                        struct restsrv_session* pSession,
                        int format,
                        std::string& strRegEx,
-                       bool bShort);
+                       bool bShort,
+                       void *cbdata);
 
 void
 restsrv_doReadVariable(struct mg_connection* conn,
                        struct restsrv_session* pSession,
                        int format,
-                       std::string& strVariableName);
+                       std::string& strVariableName,
+                       void *cbdata);
 
 void
 restsrv_doWriteVariable(struct mg_connection* conn,
                         struct restsrv_session* pSession,
                         int format,
                         std::string& strVariableName,
-                        std::string& strValue);
+                        std::string& strValue,
+                        void *cbdata);
 
 void
 restsrv_doCreateVariable(struct mg_connection* conn,
@@ -176,13 +180,15 @@ restsrv_doCreateVariable(struct mg_connection* conn,
                          std::string& strValue,
                          std::string& strPersistent,
                          std::string& strAccessRight,
-                         std::string& strNote);
+                         std::string& strNote,
+                         void *cbdata);
 
 void
 restsrv_doDeleteVariable(struct mg_connection* conn,
                          struct restsrv_session* pSession,
                          int format,
-                         std::string& strVariable);
+                         std::string& strVariable,
+                         void *cbdata);
 
 void
 restsrv_doWriteMeasurement(struct mg_connection* conn,
@@ -197,7 +203,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                            std::string& strSensorIdx,
                            std::string& strZone,
                            std::string& strSubZone,
-                           std::string& strEventFormat);
+                           std::string& strEventFormat,
+                           void *cbdata);
 
 void
 websrc_renderTableData(struct mg_connection* conn,
@@ -205,13 +212,15 @@ websrc_renderTableData(struct mg_connection* conn,
                        int format,
                        std::string& strName,
                        struct _vscpFileRecord* pRecords,
-                       long nfetchedRecords);
+                       long nfetchedRecords,
+                       void *cbdata);
 
 void
 restsrv_doFetchMDF(struct mg_connection* conn,
                    struct restsrv_session* pSession,
                    int format,
-                   std::string& strURL);
+                   std::string& strURL,
+                   void *cbdata);
 
 void
 websrc_renderTableData(struct mg_connection* conn,
@@ -219,7 +228,8 @@ websrc_renderTableData(struct mg_connection* conn,
                        int format,
                        std::string& strName,
                        struct _vscpFileRecord* pRecords,
-                       long nfetchedRecords);
+                       long nfetchedRecords,
+                       void *cbdata);
 
 void
 restsrv_doGetTableData(struct mg_connection* conn,
@@ -227,7 +237,8 @@ restsrv_doGetTableData(struct mg_connection* conn,
                        int format,
                        std::string& strName,
                        std::string& strFrom,
-                       std::string& strTo);
+                       std::string& strTo,
+                       void *cbdata);
 
 const char* rest_errors[][REST_FORMAT_COUNT + 1] = {
     { REST_PLAIN_ERROR_SUCCESS,
@@ -342,16 +353,18 @@ void
 restsrv_error(struct mg_connection* conn,
               struct restsrv_session* pSession,
               int format,
-              int errorcode)
+              int errorcode,
+              void *cbdata)
 {
     int returncode = 200;
 
-    if (__VSCP_DEBUG_REST) {
-        syslog(LOG_DEBUG,
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return; 
+
+    syslog(LOG_DEBUG,
                "REST: error format=%d errorcode=%d",
                format,
                errorcode);
-    }
 
     if (REST_FORMAT_PLAIN == format) {
 
@@ -419,13 +432,17 @@ restsrv_sendHeader(struct mg_connection* conn, int format, int returncode)
 {
     if (REST_FORMAT_PLAIN == format) {
         websrv_sendheader(conn, returncode, REST_MIME_TYPE_PLAIN);
-    } else if (REST_FORMAT_CSV == format) {
+    } 
+    else if (REST_FORMAT_CSV == format) {
         websrv_sendheader(conn, returncode, REST_MIME_TYPE_CSV);
-    } else if (REST_FORMAT_XML == format) {
+    } 
+    else if (REST_FORMAT_XML == format) {
         websrv_sendheader(conn, returncode, REST_MIME_TYPE_XML);
-    } else if (REST_FORMAT_JSON == format) {
+    } 
+    else if (REST_FORMAT_JSON == format) {
         websrv_sendheader(conn, returncode, REST_MIME_TYPE_JSON);
-    } else if (REST_FORMAT_JSONP == format) {
+    } 
+    else if (REST_FORMAT_JSONP == format) {
         websrv_sendheader(conn, returncode, REST_MIME_TYPE_JSONP);
     }
 }
@@ -435,9 +452,12 @@ restsrv_sendHeader(struct mg_connection* conn, int format, int returncode)
 //
 
 struct restsrv_session*
-restsrv_get_session(struct mg_connection* conn, std::string& sid)
+restsrv_get_session(struct mg_connection* conn, std::string& sid, void *cbdata)
 {
     const struct mg_request_info* reqinfo;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return NULL; 
 
     // Check pointers
     if (!conn || !(reqinfo = mg_get_request_info(conn))) {
@@ -451,22 +471,20 @@ restsrv_get_session(struct mg_connection* conn, std::string& sid)
     }
 
     // find existing session
-    pthread_mutex_lock(&gpobj->m_mutex_restSession);
+    pthread_mutex_lock(&pObj->m_mutex_restSession);
     std::list<struct restsrv_session*>::iterator iter;
-    for (iter = gpobj->m_rest_sessions.begin();
-         iter != gpobj->m_rest_sessions.end();
+    for (iter = pObj->m_rest_sessions.begin();
+         iter != pObj->m_rest_sessions.end();
          ++iter) {
         struct restsrv_session* pSession = *iter;
         if (0 == strcmp((const char*)sid.c_str(), pSession->m_sid)) {
             pSession->m_lastActiveTime = time(NULL);
-            pthread_mutex_unlock(&gpobj->m_mutex_restSession);
-            if (__VSCP_DEBUG_REST) {
-                syslog(LOG_DEBUG, "REST: get_session, Session found.");
-            }
+            pthread_mutex_unlock(&pObj->m_mutex_restSession);
+            syslog(LOG_DEBUG, "REST: get_session, Session found.");
             return pSession;
         }
     }
-    pthread_mutex_unlock(&gpobj->m_mutex_restSession);
+    pthread_mutex_unlock(&pObj->m_mutex_restSession);
 
     syslog(LOG_ERR, "REST: get_session, Session not found.");
     return NULL;
@@ -477,7 +495,7 @@ restsrv_get_session(struct mg_connection* conn, std::string& sid)
 //
 
 restsrv_session*
-restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem)
+restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbdata)
 {
     std::string user;
     struct restsrv_session* pSession;
@@ -488,6 +506,9 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem)
         syslog(LOG_ERR, "REST: add_session, Pointer error.");
         return 0;
     }
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return NULL; 
 
     // !!!!! This blokc is not used at the moment !!!
     // Parse "Authorization:" header, fail fast on parse error
@@ -548,23 +569,23 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem)
     pSession->m_pClientItem->m_strDeviceName = ("Internal REST server client.");
 
     // Add the client to the Client List
-    pthread_mutex_lock(&gpobj->m_clientList.m_mutexItemList);
-    if (!gpobj->addClient(pSession->m_pClientItem)) {
+    pthread_mutex_lock(&pObj->m_clientList.m_mutexItemList);
+    if (!pObj->m_clientList.addClient(pSession->m_pClientItem)) {
         // Failed to add client
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
-        pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
+        pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
         syslog(LOG_ERR,
                "REST server: new session, Failed to add client. Terminating "
                "thread.");
         return NULL;
     }
-    pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
 
     // Add to linked list
-    pthread_mutex_lock(&gpobj->m_mutex_restSession);
-    gpobj->m_rest_sessions.push_back(pSession);
-    pthread_mutex_unlock(&gpobj->m_mutex_restSession);
+    pthread_mutex_lock(&pObj->m_mutex_restSession);
+    pObj->m_rest_sessions.push_back(pSession);
+    pthread_mutex_unlock(&pObj->m_mutex_restSession);
 
     return pSession;
 }
@@ -574,28 +595,30 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem)
 //
 
 void
-restsrv_expire_sessions(struct mg_connection* conn)
+restsrv_expire_sessions(struct mg_connection* conn, void *cbdata)
 {
     time_t now;
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return; 
+
     now = time(NULL);
 
-    pthread_mutex_lock(&gpobj->m_mutex_restSession);
+    pthread_mutex_lock(&pObj->m_mutex_restSession);
 
     std::list<struct restsrv_session*>::iterator it;
 
     try {
-        for (it = gpobj->m_rest_sessions.begin();
-             it != gpobj->m_rest_sessions.end();
+        for (it = pObj->m_rest_sessions.begin();
+             it != pObj->m_rest_sessions.end();
              /* inline */) {
             struct restsrv_session* pSession = *it;
             if ((now - pSession->m_lastActiveTime) > (60 * 60)) {
-                it = gpobj->m_rest_sessions.erase(it);
-                if (__VSCP_DEBUG_REST) {
-                    syslog(LOG_DEBUG, "REST: Session expired");
-                }
+                it = pObj->m_rest_sessions.erase(it);
+                syslog(LOG_DEBUG, "REST: Session expired");
                 delete pSession;
-            } else {
+            } 
+            else {
                 ++it;
             }
         }
@@ -603,7 +626,7 @@ restsrv_expire_sessions(struct mg_connection* conn)
         syslog(LOG_ERR, "Exception expire_session");
     }
 
-    pthread_mutex_unlock(&gpobj->m_mutex_restSession);
+    pthread_mutex_unlock(&pObj->m_mutex_restSession);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -627,6 +650,9 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     const struct mg_request_info* reqinfo;
     struct restsrv_session* pSession = NULL;
     CUserItem* pUserItem             = NULL;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR; 
 
     memset(bufBody, 0, sizeof(bufBody));
 
@@ -864,11 +890,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
                  REST_PLAIN_ERROR_UNSUPPORTED_FORMAT,
                  strlen(REST_PLAIN_ERROR_UNSUPPORTED_FORMAT));
         mg_write(conn, "", 0); // Terminator
-
-        if (__VSCP_DEBUG_REST) {
-            syslog(LOG_DEBUG, "REST: restapi - invalid format ");
-        }
-
+        syslog(LOG_DEBUG, "REST: restapi - invalid format ");
         return WEB_ERROR;
     }
 
@@ -876,13 +898,13 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     if (("") != keypairs["VSCPSESSION"]) {
 
         // Get session
-        pSession = restsrv_get_session(conn, keypairs["VSCPSESSION"]);
+        pSession = restsrv_get_session(conn, keypairs["VSCPSESSION"], cbdata);
     }
 
     if (NULL == pSession) {
 
         // Get user
-        pUserItem = gpobj->m_userList.getUser(keypairs["VSCPUSER"]);
+        pUserItem = pObj->m_userList.getUser(keypairs["VSCPUSER"]);
 
         // Check if user is valid
         if (NULL == pUserItem) {
@@ -894,7 +916,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 
             syslog(LOG_ERR, "%s", strErr.c_str());
 
-            restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_USER);
+            restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_USER, cbdata);
 
             return WEB_ERROR;
         }
@@ -902,10 +924,10 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         // Check if remote ip is valid
         bool bValidHost;
 
-        pthread_mutex_lock(&gpobj->m_mutex_UserList);
+        pthread_mutex_lock(&pObj->m_mutex_UserList);
         bValidHost =
           (1 == pUserItem->isAllowedToConnect(inet_addr(reqinfo->remote_addr)));
-        pthread_mutex_unlock(&gpobj->m_mutex_UserList);
+        pthread_mutex_unlock(&pObj->m_mutex_UserList);
         if (!bValidHost) {
 
             std::string strErr = vscp_str_format(
@@ -918,17 +940,18 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
             restsrv_error(conn,
                           pSession,
                           format,
-                          REST_ERROR_CODE_INVALID_ORIGIN);
+                          REST_ERROR_CODE_INVALID_ORIGIN,
+                          cbdata);
 
             return WEB_ERROR;
         }
 
         // Is this an authorised user?
-        pthread_mutex_lock(&gpobj->m_mutex_UserList);
+        pthread_mutex_lock(&pObj->m_mutex_UserList);
         CUserItem* pValidUser =
-          gpobj->m_userList.validateUser(keypairs["VSCPUSER"],
+          pObj->m_userList.validateUser(keypairs["VSCPUSER"],
                                          keypairs["VSCPSECRET"]);
-        pthread_mutex_unlock(&gpobj->m_mutex_UserList);
+        pthread_mutex_unlock(&pObj->m_mutex_UserList);
 
         if (NULL == pValidUser) {
 
@@ -942,12 +965,13 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
             restsrv_error(conn,
                           pSession,
                           format,
-                          REST_ERROR_CODE_INVALID_PASSWORD);
+                          REST_ERROR_CODE_INVALID_PASSWORD,
+                          cbdata);
 
             return WEB_ERROR;
         }
 
-        if (NULL == (pSession = restsrv_add_session(conn, pUserItem))) {
+        if (NULL == (pSession = restsrv_add_session(conn, pUserItem, cbdata))) {
 
             // Hm,,, did not work out well...
 
@@ -960,20 +984,16 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
             restsrv_error(conn,
                           pSession,
                           format,
-                          REST_ERROR_CODE_INVALID_ORIGIN);
+                          REST_ERROR_CODE_INVALID_ORIGIN,
+                          cbdata);
 
             return WEB_ERROR;
         }
 
         // Only the "open" command is allowed here
         if (("1" == keypairs["OP"]) || ("OPEN" == keypairs["OP"])) {
-
-            if (__VSCP_DEBUG_REST) {
-                syslog(LOG_DEBUG, "REST: restapi - doOpen format=%ld", format);
-            }
-
-            restsrv_doOpen(conn, pSession, format);
-
+            syslog(LOG_DEBUG, "REST: restapi - doOpen format=%ld", format);
+            restsrv_doOpen(conn, pSession, format, cbdata);
             return WEB_OK;
         }
 
@@ -985,17 +1005,17 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 
         syslog(LOG_ERR, "%s", strErr.c_str());
 
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_ORIGIN);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_ORIGIN, cbdata);
 
         return WEB_ERROR;
     }
 
     // Check if remote ip is valid
     bool bValidHost;
-    pthread_mutex_lock(&gpobj->m_mutex_UserList);
+    pthread_mutex_lock(&pObj->m_mutex_UserList);
     bValidHost = (1 == pSession->m_pClientItem->m_pUserItem->isAllowedToConnect(
                          inet_addr(reqinfo->remote_addr)));
-    pthread_mutex_unlock(&gpobj->m_mutex_UserList);
+    pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
 
         std::string strErr = vscp_str_format(
@@ -1005,7 +1025,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 
         syslog(LOG_ERR, "%s", strErr.c_str());
 
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_ORIGIN);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_ORIGIN, cbdata);
 
         return WEB_ERROR;
     }
@@ -1025,7 +1045,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     //   *************************************************************
     if ((("0") == keypairs[("OP")]) || (("STATUS") == keypairs[("OP")])) {
         try {
-            restsrv_doStatus(conn, pSession, format);
+            restsrv_doStatus(conn, pSession, format, cbdata);
         } catch (...) {
             syslog(LOG_ERR, "REST: Exception occurred doing restsrv_doStatus");
         }
@@ -1036,7 +1056,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     //  ********************************************
     else if ((("1") == keypairs[("OP")]) || (("OPEN") == keypairs[("OP")])) {
         try {
-            restsrv_doOpen(conn, pSession, format);
+            restsrv_doOpen(conn, pSession, format, cbdata);
         } catch (...) {
             syslog(LOG_ERR, "REST: Exception occurred doing restsrv_doOpen");
         }
@@ -1048,7 +1068,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     //   **********************************************
     else if ((("2") == keypairs[("OP")]) || (("CLOSE") == keypairs[("OP")])) {
         try {
-            restsrv_doClose(conn, pSession, format);
+            restsrv_doClose(conn, pSession, format, cbdata);
         } catch (...) {
             syslog(LOG_ERR, "REST: Exception occurred doing restsrv_doClose");
         }
@@ -1063,14 +1083,14 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         if (("") != keypairs[("VSCPEVENT")]) {
             try {
                 vscp_convertStringToEvent(&vscpevent, keypairs[("VSCPEVENT")]);
-                restsrv_doSendEvent(conn, pSession, format, &vscpevent);
+                restsrv_doSendEvent(conn, pSession, format, &vscpevent, cbdata);
             } catch (...) {
                 syslog(LOG_ERR,
                        "REST: Exception occurred doing restsrv_doSendEvent");
             }
         } else {
             // Parameter missing - No Event
-            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA);
+            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
         }
     }
 
@@ -1084,7 +1104,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
             count = std::stoul(keypairs["COUNT"]);
         }
         try {
-            restsrv_doReceiveEvent(conn, pSession, format, count);
+            restsrv_doReceiveEvent(conn, pSession, format, count, cbdata);
         } catch (...) {
             syslog(LOG_ERR,
                    "REST: Exception occurred doing restsrv_doReceiveEvent");
@@ -1103,17 +1123,17 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         if (("") != keypairs[("VSCPFILTER")]) {
             vscp_readFilterFromString(&vscpfilter, keypairs[("VSCPFILTER")]);
         } else {
-            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA);
+            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
         }
 
         if (("") != keypairs[("VSCPMASK")]) {
             vscp_readMaskFromString(&vscpfilter, keypairs[("VSCPMASK")]);
         } else {
-            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA);
+            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
         }
 
         try {
-            restsrv_doSetFilter(conn, pSession, format, vscpfilter);
+            restsrv_doSetFilter(conn, pSession, format, vscpfilter, cbdata);
         } catch (...) {
             syslog(LOG_ERR,
                    "REST: Exception occurred doing restsrv_doSetFilter");
@@ -1127,7 +1147,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     else if ((("6") == keypairs[("OP")]) ||
              (("CLEARQUEUE") == keypairs[("OP")])) {
         try {
-            restsrv_doClearQueue(conn, pSession, format);
+            restsrv_doClearQueue(conn, pSession, format, cbdata);
         } catch (...) {
             syslog(LOG_ERR,
                    "REST: Exception occurred doing restsrv_doClearQueue");
@@ -1157,14 +1177,15 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
                                            keypairs[("SENSORIDX")],
                                            keypairs[("ZONE")],
                                            keypairs[("SUBZONE")],
-                                           keypairs[("SUBZONE")]);
+                                           keypairs[("SUBZONE")],
+                                           cbdata);
             } catch (...) {
                 syslog(
                   LOG_ERR,
                   "REST: Exception occurred doing restsrv_doWriteMeasurement");
             }
         } else {
-            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA);
+            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
         }
     }
 
@@ -1175,13 +1196,13 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 
         if (("") != keypairs[("URL")]) {
             try {
-                restsrv_doFetchMDF(conn, pSession, format, keypairs[("URL")]);
+                restsrv_doFetchMDF(conn, pSession, format, keypairs[("URL")], cbdata);
             } catch (...) {
                 syslog(LOG_ERR,
                        "REST: Exception occurred doing restsrv_doFetchMDF");
             }
         } else {
-            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA);
+            restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
         }
     }
 
@@ -1189,7 +1210,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 
     else {
         syslog(LOG_ERR, "REST: restapi - Missing data.");
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
     }
 
     return WEB_OK;
@@ -1202,9 +1223,13 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 void
 restsrv_doOpen(struct mg_connection* conn,
                struct restsrv_session* pSession,
-               int format)
+               int format,
+               void *cbdata)
 {
     char wrkbuf[256];
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return;
 
     if (NULL != pSession) {
 
@@ -1349,7 +1374,7 @@ restsrv_doOpen(struct mg_connection* conn,
             return;
         }
     } else { // Unable to create session
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -1362,9 +1387,13 @@ restsrv_doOpen(struct mg_connection* conn,
 void
 restsrv_doClose(struct mg_connection* conn,
                 struct restsrv_session* pSession,
-                int format)
+                int format,
+                void *cbdata)
 {
     char wrkbuf[256];
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return;
 
     if (NULL != pSession) {
 
@@ -1442,8 +1471,9 @@ restsrv_doClose(struct mg_connection* conn,
             return;
         }
 
-    } else { // session not found
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+    } 
+    else { // session not found
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -1456,10 +1486,14 @@ restsrv_doClose(struct mg_connection* conn,
 void
 restsrv_doStatus(struct mg_connection* conn,
                  struct restsrv_session* pSession,
-                 int format)
+                 int format,
+                 void *cbdata)
 {
     char buf[2048];
     char wrkbuf[256];
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return;
 
     if (NULL != pSession) {
 
@@ -1576,7 +1610,7 @@ restsrv_doStatus(struct mg_connection* conn,
 
     } // No session
     else {
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -1590,13 +1624,15 @@ void
 restsrv_doSendEvent(struct mg_connection* conn,
                     struct restsrv_session* pSession,
                     int format,
-                    vscpEvent* pEvent)
+                    vscpEvent* pEvent,
+                    void *cbdata)
 {
     bool bSent = false;
 
     // Check pointer
-    if (NULL == conn)
-        return;
+    if (NULL == conn) return;
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return;  
 
     if (NULL != pSession) {
 
@@ -1625,12 +1661,12 @@ restsrv_doSendEvent(struct mg_connection* conn,
                                         &pSession->m_pClientItem->m_filter)) {
 
                     // Lock client
-                    pthread_mutex_lock(&gpobj->m_clientList.m_mutexItemList);
+                    pthread_mutex_lock(&pObj->m_clientList.m_mutexItemList);
 
                     // If the client queue is full for this client then the
                     // client will not receive the message
                     if (pSession->m_pClientItem->m_clientInputQueue.size() <=
-                        gpobj->m_maxItemsInClientReceiveQueue) {
+                        pObj->m_maxItemsInClientReceiveQueue) {
 
                         vscpEvent* pNewEvent = new (vscpEvent);
                         if (NULL != pNewEvent) {
@@ -1659,7 +1695,7 @@ restsrv_doSendEvent(struct mg_connection* conn,
                     }
 
                     // Unlock client
-                    pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
+                    pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
 
                 } // filter
 
@@ -1674,33 +1710,37 @@ restsrv_doSendEvent(struct mg_connection* conn,
                 pEvent->obid = pSession->m_pClientItem->m_clientID;
 
                 // There must be room in the send queue
-                if (gpobj->m_maxItemsInClientReceiveQueue >
-                    gpobj->m_clientOutputQueue.size()) {
+                if (pObj->m_maxItemsInClientReceiveQueue >
+                    /*pObj->m_mutexSendQueue.size() TODO*/ 0) {
 
                     vscpEvent* pNewEvent = new (vscpEvent);
                     if (NULL != pNewEvent) {
                         vscp_copyEvent(pNewEvent, pEvent);
 
-                        pthread_mutex_lock(&gpobj->m_mutex_ClientOutputQueue);
-                        gpobj->m_clientOutputQueue.push_back(pNewEvent);
-                        pthread_mutex_unlock(&gpobj->m_mutex_ClientOutputQueue);
-                        sem_post(&gpobj->m_semClientOutputQueue);
+                        // TODO
+                        // pthread_mutex_lock(&pObj->m_mutexSendQueue);
+                        // pObj->m_mutexSendQueue.push_back(pNewEvent);
+                        // pthread_mutex_unlock(&pObj->m_mutexSendQueue);
+                        // sem_post(&pObj->m_semSendQueue);
 
                         bSent = true;
-                    } else {
+                    } 
+                    else {
                         bSent = false;
                     }
 
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_SUCCESS);
+                                  REST_ERROR_CODE_SUCCESS,
+                                  cbdata);
 
                 } else {
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_NO_ROOM);
+                                  REST_ERROR_CODE_NO_ROOM,
+                                  cbdata);
                     vscp_deleteEvent(pEvent);
                     bSent = false;
                 }
@@ -1709,14 +1749,15 @@ restsrv_doSendEvent(struct mg_connection* conn,
                 restsrv_error(conn,
                               pSession,
                               format,
-                              REST_ERROR_CODE_GENERAL_FAILURE);
+                              REST_ERROR_CODE_GENERAL_FAILURE,
+                              cbdata);
                 vscp_deleteEvent(pEvent);
                 bSent = false;
             }
 
         } // not sent
     } else {
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
         bSent = false;
     }
 
@@ -1731,7 +1772,8 @@ void
 restsrv_doReceiveEvent(struct mg_connection* conn,
                        struct restsrv_session* pSession,
                        int format,
-                       size_t count)
+                       size_t count,
+                       void *cbdata)
 {
     // Check pointer
     if (NULL == conn)
@@ -2227,11 +2269,12 @@ restsrv_doReceiveEvent(struct mg_connection* conn,
             restsrv_error(conn,
                           pSession,
                           format,
-                          RESR_ERROR_CODE_INPUT_QUEUE_EMPTY);
+                          REST_ERROR_CODE_INPUT_QUEUE_EMPTY,
+                          cbdata);
         }
 
     } else {
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -2245,7 +2288,8 @@ void
 restsrv_doSetFilter(struct mg_connection* conn,
                     struct restsrv_session* pSession,
                     int format,
-                    vscpEventFilter& vscpfilter)
+                    vscpEventFilter& vscpfilter,
+                    void *cbdata)
 {
     if (NULL != pSession) {
 
@@ -2254,9 +2298,10 @@ restsrv_doSetFilter(struct mg_connection* conn,
                &vscpfilter,
                sizeof(vscpEventFilter));
         pthread_mutex_unlock(&pSession->m_pClientItem->m_mutexClientInputQueue);
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_SUCCESS);
-    } else {
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_SUCCESS, cbdata);
+    } 
+    else {
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -2269,7 +2314,8 @@ restsrv_doSetFilter(struct mg_connection* conn,
 void
 restsrv_doClearQueue(struct mg_connection* conn,
                      struct restsrv_session* pSession,
-                     int format)
+                     int format,
+                     void *cbdata)
 {
     // Check pointer
     if (NULL == conn)
@@ -2289,9 +2335,9 @@ restsrv_doClearQueue(struct mg_connection* conn,
         pSession->m_pClientItem->m_clientInputQueue.clear();
         pthread_mutex_unlock(&pSession->m_pClientItem->m_mutexClientInputQueue);
 
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_SUCCESS);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_SUCCESS, cbdata);
     } else {
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -2314,7 +2360,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                            std::string& strSensorIdx,
                            std::string& strZone,
                            std::string& strSubZone,
-                           std::string& strEventFormat)
+                           std::string& strEventFormat,
+                           void *cbdata)
 {
     if (NULL != pSession) {
 
@@ -2391,7 +2438,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                         restsrv_error(conn,
                                       pSession,
                                       format,
-                                      REST_ERROR_CODE_GENERAL_FAILURE);
+                                      REST_ERROR_CODE_GENERAL_FAILURE,
+                                      cbdata);
                         return;
                     }
                     pEvent->pdata = NULL;
@@ -2407,13 +2455,14 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                     pEvent->vscp_class = VSCP_CLASS1_MEASUREMENT;
                     pEvent->vscp_type  = vscptype;
 
-                    restsrv_doSendEvent(conn, pSession, format, pEvent);
+                    restsrv_doSendEvent(conn, pSession, format, pEvent, cbdata);
 
                 } else {
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_GENERAL_FAILURE);
+                                  REST_ERROR_CODE_GENERAL_FAILURE,
+                                  cbdata);
                 }
             } else {
 
@@ -2423,7 +2472,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_GENERAL_FAILURE);
+                                  REST_ERROR_CODE_GENERAL_FAILURE,
+                                  cbdata);
                     return;
                 }
                 pEvent->pdata = NULL;
@@ -2437,7 +2487,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_GENERAL_FAILURE);
+                                  REST_ERROR_CODE_GENERAL_FAILURE,
+                                  cbdata);
                 }
             }
         } else { // Level II
@@ -2450,7 +2501,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_GENERAL_FAILURE);
+                                  REST_ERROR_CODE_GENERAL_FAILURE,
+                                  cbdata);
                     return;
                 }
 
@@ -2481,13 +2533,14 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_GENERAL_FAILURE);
+                                  REST_ERROR_CODE_GENERAL_FAILURE,
+                                  cbdata);
                     delete pEvent;
                     return;
                 }
                 memcpy(pEvent->pdata, data, 4 + 8);
 
-                restsrv_doSendEvent(conn, pSession, format, pEvent);
+                restsrv_doSendEvent(conn, pSession, format, pEvent, cbdata);
             } else {
                 // String
                 vscpEvent* pEvent = new vscpEvent;
@@ -2513,7 +2566,8 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                     restsrv_error(conn,
                                   pSession,
                                   format,
-                                  REST_ERROR_CODE_GENERAL_FAILURE);
+                                  REST_ERROR_CODE_GENERAL_FAILURE,
+                                  cbdata);
                     delete pEvent;
                     return;
                 }
@@ -2521,13 +2575,13 @@ restsrv_doWriteMeasurement(struct mg_connection* conn,
                        strValue.c_str(),
                        strValue.length()); // copy in double
 
-                restsrv_doSendEvent(conn, pSession, format, pEvent);
+                restsrv_doSendEvent(conn, pSession, format, pEvent, cbdata);
             }
         }
 
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_SUCCESS);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_SUCCESS, cbdata);
     } else {
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_SESSION, cbdata);
     }
 
     return;
@@ -2541,7 +2595,8 @@ void
 restsrv_doFetchMDF(struct mg_connection* conn,
                    struct restsrv_session* pSession,
                    int format,
-                   std::string& strURL)
+                   std::string& strURL,
+                   void *cbdata)
 {
 
     CMDF mdf;
@@ -2554,12 +2609,14 @@ restsrv_doFetchMDF(struct mg_connection* conn,
             restsrv_error(conn,
                           pSession,
                           format,
-                          REST_ERROR_CODE_GENERAL_FAILURE);
+                          REST_ERROR_CODE_GENERAL_FAILURE,
+                          cbdata);
         } else if (REST_FORMAT_CSV == format) {
             restsrv_error(conn,
                           pSession,
                           format,
-                          REST_ERROR_CODE_GENERAL_FAILURE);
+                          REST_ERROR_CODE_GENERAL_FAILURE,
+                          cbdata);
         } else if (REST_FORMAT_XML == format) {
 
             // Send header
@@ -2584,11 +2641,12 @@ restsrv_doFetchMDF(struct mg_connection* conn,
             restsrv_error(conn,
                           pSession,
                           format,
-                          REST_ERROR_CODE_GENERAL_FAILURE);
+                          REST_ERROR_CODE_GENERAL_FAILURE,
+                          cbdata);
         }
     } else {
         // Failed to load
-        restsrv_error(conn, pSession, format, REST_ERROR_CODE_GENERAL_FAILURE);
+        restsrv_error(conn, pSession, format, REST_ERROR_CODE_GENERAL_FAILURE, cbdata);
     }
 
     return;

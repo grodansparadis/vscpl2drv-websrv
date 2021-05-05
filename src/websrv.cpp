@@ -32,8 +32,6 @@
 
 #define _POSIX
 
-
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <linux/if_ether.h>
@@ -74,11 +72,10 @@
 
 #include <civetweb.h>
 
+#include "webobj.h"
 #include "restsrv.h"
 #include <actioncodes.h>
 #include <canal_macro.h>
-//#include <controlobject.h>
-//#include <devicelist.h>
 #include <fastpbkdf2.h>
 #include <mdf.h>
 #include <remotevariablecodes.h>
@@ -91,7 +88,7 @@
 #include <vscpdb.h>
 #include <vscphelper.h>
 #include <vscpmd5.h>
-#include <websocket.h>
+//#include <websocket.h>
 
 #include "websrv.h"
 
@@ -430,7 +427,7 @@ websrv_getHeaderElement(std::map<std::string, std::string>& hdrmap,
 //
 
 struct websrv_session*
-websrv_get_session(struct mg_connection* conn)
+websrv_get_session(struct mg_connection* conn, void *cbdata)
 {
     struct websrv_session* pSession = NULL;
     struct mg_context* ctx;
@@ -441,6 +438,9 @@ websrv_get_session(struct mg_connection* conn)
         !(reqinfo = mg_get_request_info(conn))) {
         return NULL;
     }
+
+    if (NULL == cbdata) return NULL;
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     // Get the session cookie
     const char* pheader = mg_get_header(conn, "cookie");
@@ -458,10 +458,10 @@ websrv_get_session(struct mg_connection* conn)
     }
 
     // find existing session
-    pthread_mutex_lock(&m_mutex_websrvSession);
+    pthread_mutex_lock(&pObj->m_mutex_websrvSession);
     std::list<struct websrv_session*>::iterator iter;
-    for (iter = m_web_sessions.begin();
-         iter != m_web_sessions.end();
+    for (iter = pObj->m_web_sessions.begin();
+         iter != pObj->m_web_sessions.end();
          ++iter) {
         pSession = *iter;
         if (0 == strcmp(value.c_str(), pSession->m_sid)) {
@@ -469,7 +469,7 @@ websrv_get_session(struct mg_connection* conn)
             break;
         }
     }
-    pthread_mutex_unlock(&m_mutex_websrvSession);
+    pthread_mutex_unlock(&pObj->m_mutex_websrvSession);
 
     return pSession;
 }
@@ -479,7 +479,7 @@ websrv_get_session(struct mg_connection* conn)
 //
 
 websrv_session*
-websrv_add_session(struct mg_connection* conn)
+websrv_add_session(struct mg_connection* conn, void* cbdata)
 {
     std::string user;
     struct websrv_session* pSession;
@@ -491,6 +491,9 @@ websrv_add_session(struct mg_connection* conn)
         !(reqinfo = mg_get_request_info(conn))) {
         return 0;
     }
+
+    if (NULL == cbdata) return NULL;
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     // Parse "Authorization:" header, fail fast on parse error
     const char* pheader = mg_get_header(conn, "Authorization");
@@ -530,7 +533,7 @@ websrv_add_session(struct mg_connection* conn)
               "Content-Length: 0r\n\r\n",
               pSession->m_sid);
 
-    pSession->m_pUserItem    = m_userList.getUser(std::string(user));
+    pSession->m_pUserItem    = pObj->m_userList.getUser(std::string(user));
     pSession->lastActiveTime = time(NULL);
 
     pSession->m_pClientItem = new CClientItem(); // Create client
@@ -552,22 +555,22 @@ websrv_add_session(struct mg_connection* conn)
     
 
     // Add the client to the Client List
-    pthread_mutex_lock(&m_clientList.m_mutexItemList);
-    if (!addClient(pSession->m_pClientItem)) {
+    pthread_mutex_lock(&pObj->m_clientList.m_mutexItemList);
+    if (!pObj->m_clientList.addClient(pSession->m_pClientItem)) {
         // Failed to add client
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
-        pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+        pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
         syslog(LOG_ERR,
                ("WEB server: Failed to add client. Terminating thread."));
         return NULL;
     }
-    pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
 
     // Add to linked list
-    pthread_mutex_lock(&m_mutex_websrvSession);
-    m_web_sessions.push_back(pSession);
-    pthread_mutex_unlock(&m_mutex_websrvSession);
+    pthread_mutex_lock(&pObj->m_mutex_websrvSession);
+    pObj->m_web_sessions.push_back(pSession);
+    pthread_mutex_unlock(&pObj->m_mutex_websrvSession);
 
     return pSession;
 }
@@ -577,7 +580,7 @@ websrv_add_session(struct mg_connection* conn)
 //
 
 struct websrv_session*
-websrv_getCreateSession(struct mg_connection* conn)
+websrv_getCreateSession(struct mg_connection* conn, void *cbdata)
 {
     struct websrv_session* pSession;
     struct mg_context* ctx;
@@ -589,10 +592,13 @@ websrv_getCreateSession(struct mg_connection* conn)
         return NULL;
     }
 
-    if (NULL == (pSession = websrv_get_session(conn))) {
+    if (NULL == cbdata) return NULL;
+    CWebObj *pObj = (CWebObj *)cbdata;
+
+    if (NULL == (pSession = websrv_get_session(conn, cbdata))) {
 
         // Add session cookie
-        pSession = websrv_add_session(conn);
+        pSession = websrv_add_session(conn, cbdata);
     }
 
     return pSession;
@@ -603,25 +609,28 @@ websrv_getCreateSession(struct mg_connection* conn)
 //
 
 void
-websrv_expire_sessions(struct mg_connection* conn)
+websrv_expire_sessions(struct mg_connection* conn, void* cbdata)
 {
     time_t now;
 
+    if (NULL == cbdata) return;
+    CWebObj *pObj = (CWebObj *)cbdata;
+
     now = time(NULL);
 
-    pthread_mutex_lock(&m_mutex_websrvSession);
+    pthread_mutex_lock(&pObj->m_mutex_websrvSession);
     std::list<struct websrv_session*>::iterator it;
-    for (it = m_web_sessions.begin(); it != m_web_sessions.end();
+    for (it = pObj->m_web_sessions.begin(); it != pObj->m_web_sessions.end();
          /* inline */) {
         struct websrv_session* pSession = *it;
         if ((now - pSession->lastActiveTime) > (60 * 60)) {
-            it = m_web_sessions.erase(it);
+            it = pObj->m_web_sessions.erase(it);
             delete pSession;
         } else {
             ++it;
         }
     }
-    pthread_mutex_unlock(&m_mutex_websrvSession);
+    pthread_mutex_unlock(&pObj->m_mutex_websrvSession);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -653,17 +662,20 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
         return WEB_ERROR;
     }
 
-    // Get admin user
-    if (NULL ==
-        (pUserItem = m_userList.getUser(m_admin_user.c_str()))) {
-        syslog(LOG_ERR,
-               "[websrv] check_admin_authorization: Admin user [%s] i not "
-               "available.",
-               m_admin_user.c_str());
-        //mg_send_basic_access_authentication_request(conn, NULL);  // 1.13
-        mg_send_digest_access_authentication_request(conn, NULL);
-        return 401;
-    }
+    if (NULL == cbdata) return WEB_ERROR;
+    CWebObj *pObj = (CWebObj *)cbdata;
+
+    // // Get admin user
+    // if (NULL ==
+    //     (pUserItem = m_userList.getUser(pObj->m_admin_user.c_str()))) {
+    //     syslog(LOG_ERR,
+    //            "[websrv] check_admin_authorization: Admin user [%s] i not "
+    //            "available.",
+    //            m_admin_user.c_str());
+    //     //mg_send_basic_access_authentication_request(conn, NULL);  // 1.13
+    //     mg_send_digest_access_authentication_request(conn, NULL);
+    //     return 401;
+    // }
 
     if ((NULL == (auth_header = mg_get_header(conn, "Authorization"))) ||
         (vscp_strncasecmp(auth_header, "Basic ", 6) != 0)) {
@@ -712,9 +724,9 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
         tokens.pop_front();
     }
 
-    pthread_mutex_lock(&m_mutex_UserList);
-    pUserItem = m_userList.validateUser(strUser, strPassword);
-    pthread_mutex_unlock(&m_mutex_UserList);
+    pthread_mutex_lock(&pObj->m_mutex_UserList);
+    pUserItem = pObj->m_userList.validateUser(strUser, strPassword);
+    pthread_mutex_unlock(&pObj->m_mutex_UserList);
 
     if (NULL == pUserItem) {
         // Password is not correct
@@ -729,10 +741,10 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     }
 
     // Check if remote ip is valid
-    pthread_mutex_lock(&m_mutex_UserList);
+    pthread_mutex_lock(&pObj->m_mutex_UserList);
     bValidHost =
       (1 == pUserItem->isAllowedToConnect(inet_addr(reqinfo->remote_addr)));
-    pthread_mutex_unlock(&m_mutex_UserList);
+    pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
         // Host is not allowed to connect
         syslog(LOG_ERR,
@@ -760,7 +772,9 @@ check_rest_authorization(struct mg_connection* conn, void* cbdata)
     return WEB_OK;
 }
 
+
 // -----------------------------------------------------------------------------
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Log a message
@@ -792,8 +806,10 @@ static int
 vscp_mainpage(struct mg_connection* conn, void* cbdata)
 {
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -824,12 +840,12 @@ vscp_mainpage(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "</p></span>");
     mg_printf(conn, "<span style=\"text-indent:50px;\"><p>");
     mg_printf(conn, " <b>Version:</b> ");
-    mg_printf(conn, VSCPD_DISPLAY_VERSION);
+    mg_printf(conn, DISPLAY_VERSION);
     mg_printf(conn, "</p><p>");
-    mg_printf(conn, VSCPD_COPYRIGHT_HTML);
+    mg_printf(conn, COPYRIGHT_HTML);
     mg_printf(conn, "</p></span>");
 
-    mg_printf(conn, WEB_COMMON_END, VSCPD_COPYRIGHT_HTML); // Common end code
+    mg_printf(conn, WEB_COMMON_END, COPYRIGHT_HTML); // Common end code
     return 1;
 }
 
@@ -848,8 +864,10 @@ vscp_password(struct mg_connection* conn, void* cbdata)
     memset(buf, 0, sizeof(buf));
 
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -945,8 +963,10 @@ vscp_restart(struct mg_connection* conn, void* cbdata)
     memset(buf, 0, sizeof(buf));
 
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -995,21 +1015,19 @@ vscp_restart(struct mg_connection* conn, void* cbdata)
         mg_printf(conn, "</table></form>");
     } else {
 
-        if (m_vscptoken != std::string(password)) {
-            fprintf(stderr, "websrv: Passphrase is wrong.\n");
-            mg_printf(conn, "Passphrase is wrong - will not restart!<br>");
-            return WEB_OK;
-        }
+        // if (pObj->m_vscptoken != std::string(password)) {
+        //     fprintf(stderr, "websrv: Passphrase is wrong.\n");
+        //     mg_printf(conn, "Passphrase is wrong - will not restart!<br>");
+        //     return WEB_OK;
+        // }
 
-        m_bQuit = true; // Quit main loop
-        gbStopDaemon   = true;
-        gbRestart      = true; // Restart NOT shutdown
-        sleep(1);
-        fprintf(stderr, "websrv: Shutdown in progress 1.\n");
-        sleep(1);
-        fprintf(stderr, "websrv: Shutdown in progress 2.\n");
-        sleep(1);
-        fprintf(stderr, "websrv: Shutdown in progress 3.\n");
+        // pObj->m_bQuit = true; // Quit main loop
+        // sleep(1);
+        // fprintf(stderr, "websrv: Shutdown in progress 1.\n");
+        // sleep(1);
+        // fprintf(stderr, "websrv: Shutdown in progress 2.\n");
+        // sleep(1);
+        // fprintf(stderr, "websrv: Shutdown in progress 3.\n");
 
         mg_printf(conn, "<table>");
         mg_printf(conn, "</td><tr>");
@@ -1034,8 +1052,10 @@ static int
 vscp_interface(struct mg_connection* conn, void* cbdata)
 {
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -1061,10 +1081,10 @@ vscp_interface(struct mg_connection* conn, void* cbdata)
     std::string strBuf;
 
     // Display Interface List
-    pthread_mutex_lock(&m_clientList.m_mutexItemList);
+    pthread_mutex_lock(&pObj->m_clientList.m_mutexItemList);
     std::deque<CClientItem*>::iterator it;
-    for (it = m_clientList.m_itemList.begin();
-         it != m_clientList.m_itemList.end();
+    for (it = pObj->m_clientList.m_itemList.begin();
+         it != pObj->m_clientList.m_itemList.end();
          ++it) {
 
         CClientItem* pItem = *it;
@@ -1110,7 +1130,7 @@ vscp_interface(struct mg_connection* conn, void* cbdata)
         mg_printf(conn, "</tr>");
     }
 
-    pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
 
     mg_printf(conn, WEB_IFLIST_TABLE_END);
 
@@ -1173,7 +1193,7 @@ vscp_interface(struct mg_connection* conn, void* cbdata)
               "%d - Lua Client.<br>",
               (uint8_t)CLIENT_ITEM_INTERFACE_TYPE_CLIENT_LUA);
 
-    mg_printf(conn, WEB_COMMON_END, VSCPD_COPYRIGHT_HTML); // Common end code
+    mg_printf(conn, WEB_COMMON_END, COPYRIGHT_HTML); // Common end code
 
     return WEB_OK;
 }
@@ -1186,8 +1206,10 @@ static int
 vscp_interface_info(struct mg_connection* conn, void* cbdata)
 {
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -1209,7 +1231,7 @@ vscp_interface_info(struct mg_connection* conn, void* cbdata)
     mg_printf(conn,
               "<h4>There is no extra information about this interface.</h4>");
 
-    mg_printf(conn, WEB_COMMON_END, VSCPD_COPYRIGHT_HTML); // Common end code
+    mg_printf(conn, WEB_COMMON_END, COPYRIGHT_HTML); // Common end code
 
     return WEB_OK;
 }
@@ -1222,8 +1244,10 @@ static int
 vscp_log(struct mg_connection* conn, void* cbdata)
 {
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -1254,7 +1278,7 @@ vscp_log(struct mg_connection* conn, void* cbdata)
     }
 
     mg_printf(conn, WEB_LOGLIST_TABLE_END);
-    mg_printf(conn, WEB_COMMON_END, VSCPD_COPYRIGHT_HTML); // Common end code
+    mg_printf(conn, WEB_COMMON_END, COPYRIGHT_HTML); // Common end code
 
     return WEB_OK;
 }
@@ -1270,8 +1294,10 @@ vscp_client(struct mg_connection* conn, void* cbdata)
     std::string str;
 
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: "
@@ -1305,8 +1331,10 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     std::string str;
 
     // Check pointer
-    if (NULL == conn)
-        return 0;
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
 
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -1333,59 +1361,11 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn, "<h4 id=\"header\" >&nbsp;Server</h4> ");
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>VSCP Server version:</b> ");
-    mg_printf(conn, VSCPD_DISPLAY_VERSION);
+    mg_printf(conn, DISPLAY_VERSION);
     mg_printf(conn, "<br>");
 
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Operating system:</b> ");
-#ifdef _WIN32
-    mg_printf(conn, "%s", "Windows 32-bit");
-#elif _WIN64
-#elif (__APPLE__ || __MACH__)
-      mg_printf( conn, "%s", "Mac OSX";
-#elif __linux__
-    struct utsname uts;
-    uname(&uts);
-    mg_printf(conn, "%s - ", uts.sysname);
-    mg_printf(conn, "%s - ", uts.nodename);
-    mg_printf(conn, "%s - ", uts.release);
-    mg_printf(conn, "%s - ", uts.version);
-    mg_printf(conn, "%s <br>", uts.machine);
-#elif __FreeBSD__
-    mg_printf(conn, "%s", "FreeBSD");
-#elif __unix || __unix__
-    mg_printf(conn, "%s", "Unix");
-#else
-    mg_printf(conn, "%s", "Other");
-#endif
 
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Type:</b> ");
-    if (vscp_is64Bit()) {
-        mg_printf(conn, " 64-bit ");
-    } else {
-        mg_printf(conn, " 32-bit ");
-    }
-
-    if (vscp_isLittleEndian()) {
-        mg_printf(conn, " Little endian ");
-    } else {
-        mg_printf(conn, " Big endian ");
-    }
-    mg_printf(conn, "<br>");
-
-    double vm_usage, resident_set;
-    vscp_mem_usage(vm_usage, resident_set);
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Memory usage:</b> ");
-    mg_printf(conn,
-              "<b>VM</b>: %0.0f  <b>RSS</b>: %0.0f",
-              vm_usage,
-              resident_set);
-    mg_printf(conn, " <br>");
-
-    // Debuglevel
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Debug:</b> ");
-    for (int i = 0; i < 8; i++) {
-        mg_printf(conn, "%02X ", m_debugFlags[i]);
-    }
+    
 
 #ifdef NDEBUG
     mg_printf(conn, "Build is release ");
@@ -1395,18 +1375,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn, "<br> ");
 
-    // Server GUID
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Server GUID:</b> ");
-    m_guid.toString(str);
-    mg_printf(conn, "%s", (const char*)str.c_str());
-    mg_printf(conn, "<br> ");
 
-    // Client buffer size
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Client buffer size:</b>");
-    mg_printf(conn, "%d", m_maxItemsInClientReceiveQueue);
-    mg_printf(conn, "<br> ");
 
-    mg_printf(conn, "<hr>");
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -1434,114 +1404,13 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn, "<hr>");
 
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-    mg_printf(conn, "<h4 id=\"header\" >&nbsp;TCP/IP</h4> ");
-
-    // TCP/IP interface
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>TCP/IP interface:</b> ");
-    mg_printf(conn, "enabled on <b>interface:</b> '");
-    mg_printf(conn, "%s", (const char*)m_strTcpInterfaceAddress.c_str());
-    mg_printf(conn, "'");
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Encryption:</b> ");
-    switch (m_encryptionTcpip) {
-        case 1:
-            mg_printf(conn, "AES-128");
-            break;
-
-        case 2:
-            mg_printf(conn, "AES-192");
-            break;
-
-        case 3:
-            mg_printf(conn, "AES-256");
-            break;
-
-        default:
-            mg_printf(conn, "none");
-            break;
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL certificat:</b> ");
-    mg_printf(conn,
-              "%s",
-              (const char*)std::string(m_tcpip_ssl_certificate).c_str());
-    if (!m_tcpip_ssl_certificate.length()) {
-        mg_printf(conn, "%s", "Not defined (probably should be).");
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL certificat chain:</b>");
-    mg_printf(
-      conn,
-      "%s",
-      (const char*)std::string(m_tcpip_ssl_certificate_chain).c_str());
-    if (!m_web_ssl_certificate_chain.length()) {
-        mg_printf(conn, "%s", "Not defined (default).");
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL verify peer:</b> ");
-    mg_printf(conn, "%s", m_tcpip_ssl_verify_peer ? "true" : "false");
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL CA path:</b> ");
-    mg_printf(conn,
-              "%s",
-              (const char*)std::string(m_tcpip_ssl_ca_path).c_str());
-    if (!m_web_ssl_ca_path.length()) {
-        mg_printf(conn, "%s", "Not defined (default).");
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL CA file:</b> ");
-    mg_printf(conn,
-              "%s",
-              (const char*)std::string(m_tcpip_ssl_ca_file).c_str());
-    if (!m_web_ssl_ca_file.length()) {
-        mg_printf(conn, "%s", "Not defined (default).");
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL verify depth:</b> ");
-    mg_printf(conn, "%d", (int)m_tcpip_ssl_verify_depth);
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL verify paths:</b> ");
-    mg_printf(conn,
-              "%s",
-              m_tcpip_ssl_default_verify_paths ? "true" : "false");
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL cipher list:</b> ");
-    mg_printf(conn,
-              "%s",
-              (const char*)std::string(m_tcpip_ssl_cipher_list).c_str());
-    if (!m_tcpip_ssl_cipher_list.length()) {
-        mg_printf(conn, "%s", "Not defined (default).");
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL protocol version:</b>");
-    mg_printf(conn, "%d", (int)m_tcpip_ssl_protocol_version);
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL short trust:</b> ");
-    mg_printf(conn, "%s", m_tcpip_ssl_short_trust ? "true" : "false");
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "<hr>");
-
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * ** * * * * *
 
     mg_printf(conn, "<h4 id=\"header\" >&nbsp;Web server</h4> ");
 
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Web server functionality </b>is ");
-    if (m_web_bEnable) {
+    if (pObj->m_bEnableWebServer) {
         mg_printf(conn, "enabled.<br>");
     } else {
         mg_printf(conn, "disabled.<br>");
@@ -1549,23 +1418,24 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Listening port(s)/interface(s):</b>");
-    mg_printf(conn, "%s", (const char*)m_web_listening_ports.c_str());
+    mg_printf(conn, "%s", (const char*)pObj->m_web_listening_ports.c_str());
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Rootfolder:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_document_root).c_str());
+              (const char*)std::string(pObj->m_web_document_root).c_str());
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Authdomain:</b> ");
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_authentication_domain).c_str());
-    if (m_enable_auth_domain_check) {
+      (const char*)std::string(pObj->m_web_authentication_domain).c_str());
+    if (pObj->m_enable_auth_domain_check) {
         mg_printf(conn, " [will be checked].");
-    } else {
+    } 
+    else {
         mg_printf(conn, " [will not be checked].");
     }
     mg_printf(conn, "<br>");
@@ -1573,14 +1443,14 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Index files:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_index_files).c_str());
+              (const char*)std::string(pObj->m_web_index_files).c_str());
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL certificat:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_ssl_certificate).c_str());
-    if (!m_web_ssl_certificate.length()) {
+              (const char*)std::string(pObj->m_web_ssl_certificate).c_str());
+    if (!pObj->m_web_ssl_certificate.length()) {
         mg_printf(conn, "%s", "Not defined (probably should be).");
     }
     mg_printf(conn, "<br>");
@@ -1589,21 +1459,21 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_ssl_certificate_chain).c_str());
-    if (!m_web_ssl_certificate_chain.length()) {
+      (const char*)std::string(pObj->m_web_ssl_certificate_chain).c_str());
+    if (!pObj->m_web_ssl_certificate_chain.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL verify peer:</b> ");
-    mg_printf(conn, "%s", m_web_ssl_verify_peer ? "true" : "false");
+    mg_printf(conn, "%s", pObj->m_web_ssl_verify_peer ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL CA path:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_ssl_ca_path).c_str());
-    if (!m_web_ssl_ca_path.length()) {
+              (const char*)std::string(pObj->m_web_ssl_ca_path).c_str());
+    if (!pObj->m_web_ssl_ca_path.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -1611,44 +1481,44 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL CA file:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_ssl_ca_file).c_str());
-    if (!m_web_ssl_ca_file.length()) {
+              (const char*)std::string(pObj->m_web_ssl_ca_file).c_str());
+    if (!pObj->m_web_ssl_ca_file.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL verify depth:</b> ");
-    mg_printf(conn, "%d", (int)m_web_ssl_verify_depth);
+    mg_printf(conn, "%d", (int)pObj->m_web_ssl_verify_depth);
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL verify paths:</b> ");
     mg_printf(conn,
               "%s",
-              m_web_ssl_default_verify_paths ? "true" : "false");
+              pObj->m_web_ssl_default_verify_paths ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL cipher list:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_ssl_cipher_list).c_str());
-    if (!m_web_ssl_cipher_list.length()) {
+              (const char*)std::string(pObj->m_web_ssl_cipher_list).c_str());
+    if (!pObj->m_web_ssl_cipher_list.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL protocol version:</b>");
-    mg_printf(conn, "%d", (int)m_web_ssl_protocol_version);
+    mg_printf(conn, "%d", (int)pObj->m_web_ssl_protocol_version);
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSL short trust:</b> ");
-    mg_printf(conn, "%s", m_web_ssl_short_trust ? "true" : "false");
+    mg_printf(conn, "%s", pObj->m_web_ssl_short_trust ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>CGI interpreter:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_cgi_interpreter).c_str());
-    if (!m_web_cgi_interpreter.length()) {
+              (const char*)std::string(pObj->m_web_cgi_interpreter).c_str());
+    if (!pObj->m_web_cgi_interpreter.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -1656,8 +1526,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>CGI patterns:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_cgi_patterns).c_str());
-    if (!m_web_cgi_patterns.length()) {
+              (const char*)std::string(pObj->m_web_cgi_patterns).c_str());
+    if (!pObj->m_web_cgi_patterns.length()) {
         mg_printf(conn, "%s", "Not defined (probably should be defined).");
     }
     mg_printf(conn, "<br>");
@@ -1665,8 +1535,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>CGI environment:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_cgi_environment).c_str());
-    if (!m_web_cgi_environment.length()) {
+              (const char*)std::string(pObj->m_web_cgi_environment).c_str());
+    if (!pObj->m_web_cgi_environment.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -1674,8 +1544,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Protect URI:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_protect_uri).c_str());
-    if (!m_web_protect_uri.length()) {
+              (const char*)std::string(pObj->m_web_protect_uri).c_str());
+    if (!pObj->m_web_protect_uri.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -1683,8 +1553,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Trottle:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_trottle).c_str());
-    if (!m_web_trottle.length()) {
+              (const char*)std::string(pObj->m_web_trottle).c_str());
+    if (!pObj->m_web_trottle.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -1693,16 +1563,16 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Enable directory listings:</b>");
     mg_printf(conn,
               "%s",
-              m_web_enable_directory_listing ? "true" : "false");
+              pObj->m_web_enable_directory_listing ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Enable keep alive:</b>");
-    mg_printf(conn, "%s", m_web_enable_keep_alive ? "true" : "false");
+    mg_printf(conn, "%s", pObj->m_web_enable_keep_alive ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Keep alive timeout in ms:</b>");
-    if (-1 == m_web_keep_alive_timeout_ms) {
-        mg_printf(conn, "%ld", (long)m_web_keep_alive_timeout_ms);
+    if (-1 == pObj->m_web_keep_alive_timeout_ms) {
+        mg_printf(conn, "%ld", (long)pObj->m_web_keep_alive_timeout_ms);
     } else {
         mg_printf(conn, "%s", "Not defined (Default: 500) ).");
     }
@@ -1713,8 +1583,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_access_control_list).c_str());
-    if (!m_web_access_control_list.length()) {
+      (const char*)std::string(pObj->m_web_access_control_list).c_str());
+    if (!pObj->m_web_access_control_list.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -1722,15 +1592,15 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>ExtraMimeTypes:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_extra_mime_types).c_str());
-    if (0 == m_web_extra_mime_types.length()) {
+              (const char*)std::string(pObj->m_web_extra_mime_types).c_str());
+    if (0 == pObj->m_web_extra_mime_types.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Number of threads:</b>");
-    if (-1 == m_web_num_threads) {
-        mg_printf(conn, "%d", (int)m_web_num_threads);
+    if (-1 == pObj->m_web_num_threads) {
+        mg_printf(conn, "%d", (int)pObj->m_web_num_threads);
     } else {
         mg_printf(conn, "%s", "Not defined (Default: 50) ).");
     }
@@ -1740,16 +1610,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_hide_file_patterns).c_str());
-    if (0 == m_web_hide_file_patterns.length()) {
+      (const char*)std::string(pObj->m_web_hide_file_patterns).c_str());
+    if (0 == pObj->m_web_hide_file_patterns.length()) {
         mg_printf(conn, "Set to default.");
-    }
-    mg_printf(conn, "<br>");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Run as user:</b> ");
-    mg_printf(conn, "%s", (const char*)std::string(m_runAsUser).c_str());
-    if (0 == m_runAsUser.length()) {
-        mg_printf(conn, "Using vscpd user.");
     }
     mg_printf(conn, "<br>");
 
@@ -1757,8 +1620,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_url_rewrite_patterns).c_str());
-    if (0 == m_web_url_rewrite_patterns.length()) {
+      (const char*)std::string(pObj->m_web_url_rewrite_patterns).c_str());
+    if (0 == pObj->m_web_url_rewrite_patterns.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1767,37 +1630,37 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_hide_file_patterns).c_str());
-    if (0 == m_web_hide_file_patterns.length()) {
+      (const char*)std::string(pObj->m_web_hide_file_patterns).c_str());
+    if (0 == pObj->m_web_hide_file_patterns.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Request timeout:</b> ");
-    if (-1 == m_web_request_timeout_ms) {
-        mg_printf(conn, "%ld", (long)m_web_request_timeout_ms);
+    if (-1 == pObj->m_web_request_timeout_ms) {
+        mg_printf(conn, "%ld", (long)pObj->m_web_request_timeout_ms);
     } else {
         mg_printf(conn, "%s", "Not defined (Default: 30000) ).");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Linger timeout:</b> ");
-    if (-1 == m_web_linger_timeout_ms) {
-        mg_printf(conn, "%ld", (long)m_web_linger_timeout_ms);
+    if (-1 == pObj->m_web_linger_timeout_ms) {
+        mg_printf(conn, "%ld", (long)pObj->m_web_linger_timeout_ms);
     } else {
         mg_printf(conn, "%s", "Not set.");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Enable decode URL:</b>");
-    mg_printf(conn, " %s ", m_web_decode_url ? " true " : "false");
+    mg_printf(conn, " %s ", pObj->m_web_decode_url ? " true " : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Path to global auth file:</b>");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_global_auth_file).c_str());
-    if (0 == m_web_global_auth_file.length()) {
+              (const char*)std::string(pObj->m_web_global_auth_file).c_str());
+    if (0 == pObj->m_web_global_auth_file.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1806,8 +1669,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_per_directory_auth_file).c_str());
-    if (0 == m_web_per_directory_auth_file.length()) {
+      (const char*)std::string(pObj->m_web_per_directory_auth_file).c_str());
+    if (0 == pObj->m_web_per_directory_auth_file.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1815,8 +1678,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>SSI patterns:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_ssi_patterns).c_str());
-    if (0 == m_web_ssi_patterns.length()) {
+              (const char*)std::string(pObj->m_web_ssi_patterns).c_str());
+    if (0 == pObj->m_web_ssi_patterns.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1825,9 +1688,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Access control allow origin:</b>");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_access_control_allow_origin)
+              (const char*)std::string(pObj->m_web_access_control_allow_origin)
                 .c_str());
-    if (0 == m_web_access_control_allow_origin.length()) {
+    if (0 == pObj->m_web_access_control_allow_origin.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1837,9 +1700,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_access_control_allow_methods)
+      (const char*)std::string(pObj->m_web_access_control_allow_methods)
         .c_str());
-    if (0 == m_web_access_control_allow_methods.length()) {
+    if (0 == pObj->m_web_access_control_allow_methods.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1849,9 +1712,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_access_control_allow_headers)
+      (const char*)std::string(pObj->m_web_access_control_allow_headers)
         .c_str());
-    if (0 == m_web_access_control_allow_headers.length()) {
+    if (0 == pObj->m_web_access_control_allow_headers.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1859,8 +1722,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Path to error pages:</b>");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_error_pages).c_str());
-    if (0 == m_web_error_pages.length()) {
+              (const char*)std::string(pObj->m_web_error_pages).c_str());
+    if (0 == pObj->m_web_error_pages.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
@@ -1868,8 +1731,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "&nbsp;&nbsp;&nbsp;&nbsp;<b>Enable TCP_NODELAY socket option:</b>");
-    if (-1 == m_web_tcp_nodelay) {
-        mg_printf(conn, "%ld", (long)m_web_tcp_nodelay);
+    if (-1 == pObj->m_web_tcp_nodelay) {
+        mg_printf(conn, "%ld", (long)pObj->m_web_tcp_nodelay);
     } else {
         mg_printf(conn, "%s", "Not set.");
     }
@@ -1877,8 +1740,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Static file max age(seconds):</b>");
-    if (-1 == m_web_static_file_max_age) {
-        mg_printf(conn, "%ld", (long)m_web_static_file_max_age);
+    if (-1 == pObj->m_web_static_file_max_age) {
+        mg_printf(conn, "%ld", (long)pObj->m_web_static_file_max_age);
     } else {
         mg_printf(conn, "%s", "Not set.");
     }
@@ -1887,31 +1750,31 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Strict transport security max age"
               "(seconds):</b> ");
-    if (-1 == m_web_strict_transport_security_max_age) {
+    if (-1 == pObj->m_web_strict_transport_security_max_age) {
         mg_printf(conn,
                   "%ld",
-                  (long)m_web_strict_transport_security_max_age);
+                  (long)pObj->m_web_strict_transport_security_max_age);
     } else {
         mg_printf(conn, "%s", "Not set.");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Allow sendfile call:</b>");
-    mg_printf(conn, "%s", m_web_allow_sendfile_call ? "true" : "false");
+    mg_printf(conn, "%s", pObj->m_web_allow_sendfile_call ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Additional headers:</b>");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_additional_header).c_str());
-    if (0 == m_web_additional_header.length()) {
+              (const char*)std::string(pObj->m_web_additional_header).c_str());
+    if (0 == pObj->m_web_additional_header.length()) {
         mg_printf(conn, "Set to default.");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Max request size:</b> ");
-    if (-1 == m_web_max_request_size) {
-        mg_printf(conn, "%ld", (long)m_web_max_request_size);
+    if (-1 == pObj->m_web_max_request_size) {
+        mg_printf(conn, "%ld", (long)pObj->m_web_max_request_size);
     } else {
         mg_printf(conn, "%s", "Not set.");
     }
@@ -1921,15 +1784,15 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Allow index script resource:</b>");
     mg_printf(conn,
               "%s",
-              m_web_allow_index_script_resource ? "true" : "false");
+              pObj->m_web_allow_index_script_resource ? "true" : "false");
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Duktape script patters:</b>");
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_duktape_script_patterns).c_str());
-    if (0 == m_web_duktape_script_patterns.length()) {
+      (const char*)std::string(pObj->m_web_duktape_script_patterns).c_str());
+    if (0 == pObj->m_web_duktape_script_patterns.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -1937,8 +1800,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Lua preload file:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(m_web_lua_preload_file).c_str());
-    if (0 == m_web_lua_preload_file.length()) {
+              (const char*)std::string(pObj->m_web_lua_preload_file).c_str());
+    if (0 == pObj->m_web_lua_preload_file.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -1947,8 +1810,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_lua_script_patterns).c_str());
-    if (0 == m_web_lua_script_patterns.length()) {
+      (const char*)std::string(pObj->m_web_lua_script_patterns).c_str());
+    if (0 == pObj->m_web_lua_script_patterns.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -1957,8 +1820,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_lua_server_page_patterns).c_str());
-    if (0 == m_web_lua_server_page_patterns.length()) {
+      (const char*)std::string(pObj->m_web_lua_server_page_patterns).c_str());
+    if (0 == pObj->m_web_lua_server_page_patterns.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -1967,8 +1830,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_lua_websocket_patterns).c_str());
-    if (0 == m_web_lua_websocket_patterns.length()) {
+      (const char*)std::string(pObj->m_web_lua_websocket_patterns).c_str());
+    if (0 == pObj->m_web_lua_websocket_patterns.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -1977,8 +1840,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_lua_background_script).c_str());
-    if (0 == m_web_lua_background_script.length()) {
+      (const char*)std::string(pObj->m_web_lua_background_script).c_str());
+    if (0 == pObj->m_web_lua_background_script.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -1989,9 +1852,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_web_lua_background_script_params)
+      (const char*)std::string(pObj->m_web_lua_background_script_params)
         .c_str());
-    if (0 == m_web_lua_background_script_params.length()) {
+    if (0 == pObj->m_web_lua_background_script_params.length()) {
         mg_printf(conn, "Not set.");
     }
     mg_printf(conn, "<br>");
@@ -2004,7 +1867,7 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Web sockets functionality </b> is ");
-    if (m_web_bEnable && m_bWebsocketsEnable) {
+    if (pObj->m_bEnableWebServer && pObj->m_bEnableWebsockets) {
         mg_printf(conn, "enabled.<br>");
     } else {
         mg_printf(conn, "disabled.<br>");
@@ -2014,15 +1877,15 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(
       conn,
       "%s",
-      (const char*)std::string(m_websocket_document_root).c_str());
-    if (0 == m_websocket_document_root.length()) {
+      (const char*)std::string(pObj->m_websocket_document_root).c_str());
+    if (0 == pObj->m_websocket_document_root.length()) {
         mg_printf(conn, "Not set == Same as web root folder");
     }
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Websocket timeout (ms):</b>");
-    mg_printf(conn, "%ld", m_websocket_timeout_ms);
-    if (0 == m_websocket_timeout_ms) {
+    mg_printf(conn, "%ld", pObj->m_websocket_timeout_ms);
+    if (0 == pObj->m_websocket_timeout_ms) {
         mg_printf(conn, "Set to default: 30000");
     }
     mg_printf(conn, "<br>");
@@ -2030,7 +1893,7 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Web sockets ping-pong functionality "
               "</b> is ");
-    if (m_web_bEnable && bEnable_websocket_ping_pong) {
+    if (pObj->m_bEnableWebServer && pObj->bEnable_websocket_ping_pong) {
         mg_printf(conn, "enabled.<br>");
     } else {
         mg_printf(conn, "disabled.<br>");
@@ -2039,7 +1902,7 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Websocket lua pattern:</b>");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(lua_websocket_pattern).c_str());
+              (const char*)std::string(pObj->lua_websocket_pattern).c_str());
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "<hr>");
@@ -2050,7 +1913,7 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>REST API functionality </b> is ");
-    if (m_web_bEnable && m_bEnableRestApi) {
+    if (pObj->m_bEnableWebServer && pObj->m_bEnableRestApi) {
         mg_printf(conn, "enabled.<br>");
     } else {
         mg_printf(conn, "disabled.<br>");
@@ -2059,80 +1922,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "<br>");
     mg_printf(conn, "<hr>");
 
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * ** * * * * *
-
-    mg_printf(conn, "<h4 id=\"header\" >&nbsp;Level I drivers</h4> ");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Level I Drivers:</b> ");
-
-    mg_printf(conn, "enabled<br>");
-    mg_printf(conn,
-              "&nbsp;&nbsp;&nbsp;&nbsp;----------------------------------<br>");
-
-    CDeviceItem* pDeviceItem;
-    std::deque<CDeviceItem*>::iterator it;
-    for (it = m_deviceList.m_devItemList.begin();
-         it != m_deviceList.m_devItemList.end();
-         ++it) {
-        pDeviceItem = *it;
-        if ((NULL != pDeviceItem) &&
-            (VSCP_DRIVER_LEVEL1 == pDeviceItem->m_driverLevel) &&
-            pDeviceItem->m_bEnable) {
-            mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Name:</b> ");
-            mg_printf(conn, "%s", (const char*)pDeviceItem->m_strName.c_str());
-            mg_printf(conn, "<br>");
-            mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Config:</b> ");
-            mg_printf(conn,
-                      "%s",
-                      (const char*)pDeviceItem->m_strParameter.c_str());
-            mg_printf(conn, "<br>");
-            mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Path:</b> ");
-            mg_printf(conn, "%s", (const char*)pDeviceItem->m_strPath.c_str());
-            mg_printf(conn, "<br>");
-            mg_printf(
-              conn,
-              "&nbsp;&nbsp;&nbsp;&nbsp;----------------------------------<br>");
-        }
-    }
-
-    mg_printf(conn, "<hr>");
-
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * ** * * * * *
-
-    mg_printf(conn, "<h4 id=\"header\" >&nbsp;Level II drivers</h4> ");
-
-    mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Level II Drivers:</b> ");
-    mg_printf(conn, "enabled<br>");
-
-    mg_printf(conn,
-              "&nbsp;&nbsp;&nbsp;&nbsp;----------------------------------<br>");
-
-    for (it = m_deviceList.m_devItemList.begin();
-         it != m_deviceList.m_devItemList.end();
-         ++it) {
-        pDeviceItem = *it;
-        if ((NULL != pDeviceItem) &&
-            (VSCP_DRIVER_LEVEL2 == pDeviceItem->m_driverLevel) &&
-            pDeviceItem->m_bEnable) {
-            mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Name:</b> ");
-            mg_printf(conn, "%s", (const char*)pDeviceItem->m_strName.c_str());
-            mg_printf(conn, "<br>");
-            mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Config:</b> ");
-            mg_printf(conn,
-                      "%s",
-                      (const char*)pDeviceItem->m_strParameter.c_str());
-            mg_printf(conn, "<br>");
-            mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Driver path:</b> ");
-            mg_printf(conn, "%s", (const char*)pDeviceItem->m_strPath.c_str());
-            mg_printf(conn, "<br>");
-            mg_printf(
-              conn,
-              "&nbsp;&nbsp;&nbsp;&nbsp;----------------------------------<br>");
-        }
-    }
 
     mg_printf(conn, "<br>");
-    mg_printf(conn, WEB_COMMON_END, VSCPD_COPYRIGHT_HTML); // Common end code
+    mg_printf(conn, WEB_COMMON_END, COPYRIGHT_HTML); // Common end code
 
     return WEB_OK;
 }
@@ -2150,6 +1942,9 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
 int
 ExampleHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: "
               "close\r\n\r\n");
@@ -2210,6 +2005,9 @@ ExampleHandler(struct mg_connection* conn, void* cbdata)
 int
 ExitHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: "
               "text/plain\r\nConnection: close\r\n\r\n");
@@ -2226,6 +2024,9 @@ ExitHandler(struct mg_connection* conn, void* cbdata)
 int
 AHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: "
               "close\r\n\r\n");
@@ -2243,6 +2044,9 @@ AHandler(struct mg_connection* conn, void* cbdata)
 int
 ABHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: "
               "close\r\n\r\n");
@@ -2260,6 +2064,9 @@ ABHandler(struct mg_connection* conn, void* cbdata)
 int
 BXHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     // Handler may access the request info using mg_get_request_info
     const struct mg_request_info* req_info = mg_get_request_info(conn);
 
@@ -2281,6 +2088,9 @@ BXHandler(struct mg_connection* conn, void* cbdata)
 int
 FooHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     // Handler may access the request info using mg_get_request_info
     const struct mg_request_info* req_info = mg_get_request_info(conn);
 
@@ -2306,6 +2116,9 @@ FooHandler(struct mg_connection* conn, void* cbdata)
 int
 CloseHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     // Handler may access the request info using mg_get_request_info
     // const struct mg_request_info *req_info =
     // mg_get_request_info(conn);
@@ -2420,6 +2233,8 @@ FileHandler(struct mg_connection* conn, void* cbdata)
 // int
 // FormHandler(struct mg_connection *conn, void *cbdata)
 // {
+//     CWebObj *pObj = cbdata;
+//     if (NULL == cbdata) return WEB_ERROR;    
 //     // Handler may access the request info using mg_get_request_info
 //     const struct mg_request_info *req_info =
 //     mg_get_request_info(conn); int ret; struct web_form_data_handler
@@ -2452,6 +2267,8 @@ FileHandler(struct mg_connection* conn, void* cbdata)
 // int
 // FileUploadForm(struct mg_connection *conn, void *cbdata)
 // {
+//       CWebObj *pObj = cbdata;
+//       if (NULL == cbdata) return WEB_ERROR;
 //     mg_printf(conn,
 //                "HTTP/1.1 200 OK\r\nContent-Type:
 //                text/html\r\nConnection: " "close\r\n\r\n");
@@ -2497,8 +2314,10 @@ FileHandler(struct mg_connection* conn, void* cbdata)
 //                            const char *filename,
 //                            char *path,
 //                            size_t pathlen,
-//                            void *user_data)
+//                            void *cbdata)
 // {
+//     CWebObj *pObj = cbdata;
+//     if (NULL == cbdata) return WEB_ERROR;
 //     struct tfiles_checksums *context = (struct tfiles_checksums
 //     *)user_data;
 
@@ -2526,8 +2345,10 @@ FileHandler(struct mg_connection* conn, void* cbdata)
 // field_get_checksum(const char *key,
 //                    const char *value,
 //                    size_t valuelen,
-//                    void *user_data)
+//                    void *cbata)
 // {
+//      CWebObj *pObj = cbdata;
+//      if (NULL == cbdata) return WEB_ERROR;
 //     struct tfiles_checksums *context = (struct tfiles_checksums
 //     *)user_data; (void)key;
 
@@ -2546,6 +2367,8 @@ FileHandler(struct mg_connection* conn, void* cbdata)
 // int
 // CheckSumHandler(struct mg_connection *conn, void *cbdata)
 // {
+//        CWebObj *pObj = cbdata;
+//        if (NULL == cbdata) return WEB_ERROR;
 //     // Handler may access the request info using mg_get_request_info
 //     const struct mg_request_info *req_info =
 //     mg_get_request_info(conn); int i, j, ret; struct tfiles_checksums
@@ -2598,6 +2421,9 @@ CookieHandler(struct mg_connection* conn, void* cbdata)
     char first_str[64], count_str[64];
     int count;
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     (void)mg_get_cookie(cookie, "first", first_str, sizeof(first_str));
     (void)mg_get_cookie(cookie, "count", count_str, sizeof(count_str));
 
@@ -2645,6 +2471,9 @@ PostResponser(struct mg_connection* conn, void* cbdata)
     int r, s;
 
     char buf[2048];
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
 
     const struct mg_request_info* ri = mg_get_request_info(conn);
 
@@ -2700,6 +2529,9 @@ PostResponser(struct mg_connection* conn, void* cbdata)
 int
 WebSocketStartHandler(struct mg_connection* conn, void* cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     mg_printf(conn,
               "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: "
               "close\r\n\r\n");
@@ -2778,6 +2610,9 @@ WebSocketConnectHandler(const struct mg_connection* conn, void* cbdata)
     int reject             = 1;
     int i;
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR;
+
     mg_lock_context(ctx);
     for (i = 0; i < MAX_WS_CLIENTS; i++) {
         if (ws_clients[i].conn == NULL) {
@@ -2809,6 +2644,9 @@ WebSocketReadyHandler(struct mg_connection* conn, void* cbdata)
     struct t_ws_client* client =
       (struct t_ws_client*)mg_get_user_connection_data(conn);
 
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return;  
+
     mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, text, strlen(text));
     fprintf(stdout, "Greeting message sent to websocket client\r\n\r\n");
     ASSERT(client->conn == conn);
@@ -2830,7 +2668,10 @@ WebsocketDataHandler(struct mg_connection* conn,
 {
     struct t_ws_client* client =
       (struct t_ws_client*)mg_get_user_connection_data(conn);
-    ASSERT(client->conn == conn);
+    if (NULL == conn) return WEB_ERROR;
+    if (NULL == cbdata) return WEB_ERROR;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
     ASSERT(client->state >= 1);
 
     fprintf(stdout, "Websocket got %lu bytes of ", (unsigned long)len);
@@ -2874,16 +2715,19 @@ WebSocketCloseHandler(const struct mg_connection* conn, void* cbdata)
     struct mg_context* ctx = mg_get_context(conn);
     struct t_ws_client* client =
       (struct t_ws_client*)mg_get_user_connection_data(conn);
-    ASSERT(client->conn == conn);
-    ASSERT(client->state >= 1);
+
+    if (NULL == conn) return;
+    if (NULL == cbdata) return;
+
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (client->state >= 1);
 
     mg_lock_context(ctx);
     client->state = 0;
     client->conn  = NULL;
     mg_unlock_context(ctx);
 
-    fprintf(stdout,
-            "Client droped from the set of webserver connections\r\n\r\n");
+    fprintf(stdout, "Client dropped from the set of webserver connections\r\n\r\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3005,15 +2849,22 @@ init_ssl(void* ssl_context, void* user_data)
 //
 
 int
-start_webserver(void)
+start_webserver(void *cbdata)
 {
-    syslog(LOG_ERR, ("Starting web server...\n"));
+    syslog(LOG_DEBUG, ("Starting web server..."));
 
-    if (m_bWebsocketsEnable) {
+    if (NULL != cbdata) {
+        syslog(LOG_ERR, ("No user data supplied. The webserver need this. Aborting!"));
+        return EXIT_FAILURE;
+    }
+
+    CWebObj *pObj = (CWebObj *)cbdata;  
+
+    if (pObj->m_bEnableWebsockets) {
         syslog(LOG_ERR, ("Websockets enable...\n"));
     }
 
-    if (m_bEnableRestApi) {
+    if (pObj->m_bEnableRestApi) {
         syslog(LOG_ERR, ("REST API enable...\n"));
     }
 
@@ -3027,24 +2878,24 @@ start_webserver(void)
 
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DOCUMENT_ROOT + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_document_root.c_str());
+      vscp_strdup((const char*)pObj->m_web_document_root.c_str());
 
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LISTENING_PORTS + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_listening_ports.c_str());
+      vscp_strdup((const char*)pObj->m_web_listening_ports.c_str());
 
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_INDEX_FILES + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_index_files.c_str());
+      vscp_strdup((const char*)pObj->m_web_index_files.c_str());
 
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_AUTHENTICATION_DOMAIN + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_authentication_domain.c_str());
+      vscp_strdup((const char*)pObj->m_web_authentication_domain.c_str());
 
     // Set only if not default value
-    if (!m_enable_auth_domain_check) {
+    if (!pObj->m_enable_auth_domain_check) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_AUTH_DOMAIN_CHECK + 4);
         web_options[pos++] = vscp_strdup("no");
@@ -3053,44 +2904,44 @@ start_webserver(void)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CERTIFICATE + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_ssl_certificate.c_str());
+      vscp_strdup((const char*)pObj->m_web_ssl_certificate.c_str());
 
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CERTIFICAT_CHAIN + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_ssl_certificate_chain.c_str());
+      vscp_strdup((const char*)pObj->m_web_ssl_certificate_chain.c_str());
 
     // Set only if not default value
-    if (m_web_ssl_verify_peer) {
+    if (pObj->m_web_ssl_verify_peer) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_PEER + 4);
         web_options[pos++] = vscp_strdup("yes");
     }
 
-    if (m_web_ssl_ca_path.length()) {
+    if (pObj->m_web_ssl_ca_path.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CA_PATH + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_ssl_ca_path.c_str());
+          vscp_strdup((const char*)pObj->m_web_ssl_ca_path.c_str());
     }
 
-    if (m_web_ssl_ca_file.length()) {
+    if (pObj->m_web_ssl_ca_file.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CA_FILE + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_ssl_ca_file.c_str());
+          vscp_strdup((const char*)pObj->m_web_ssl_ca_file.c_str());
     }
 
-    if (m_web_ssl_verify_depth !=
+    if (pObj->m_web_ssl_verify_depth !=
         atoi(VSCPDB_CONFIG_DEFAULT_WEB_SSL_VERIFY_DEPTH)) {
         std::string str =
-          vscp_str_format(("%d"), (int)m_web_ssl_verify_depth);
+          vscp_str_format(("%d"), (int)pObj->m_web_ssl_verify_depth);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_DEPTH + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (!m_web_ssl_default_verify_paths) {
+    if (!pObj->m_web_ssl_default_verify_paths) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_DEFAULT_VERIFY_PATHS + 4);
         web_options[pos++] = vscp_strdup("no");
@@ -3099,313 +2950,313 @@ start_webserver(void)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CHIPHER_LIST + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)m_web_ssl_cipher_list.c_str());
+      vscp_strdup((const char*)pObj->m_web_ssl_cipher_list.c_str());
 
-    if (m_web_ssl_protocol_version !=
+    if (pObj->m_web_ssl_protocol_version !=
         atoi(VSCPDB_CONFIG_DEFAULT_WEB_SSL_PROTOCOL_VERSION)) {
         std::string str =
-          vscp_str_format(("%d"), (int)m_web_ssl_protocol_version);
+          vscp_str_format(("%d"), (int)pObj->m_web_ssl_protocol_version);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_PROTOCOL_VERSION + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (!m_web_ssl_short_trust) {
+    if (!pObj->m_web_ssl_short_trust) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_SHORT_TRUST + 4);
         web_options[pos++] = vscp_strdup("yes");
     }
 
-    if (m_web_cgi_interpreter.length()) {
+    if (pObj->m_web_cgi_interpreter.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_CGI_INTERPRETER + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_cgi_interpreter.c_str());
+          vscp_strdup((const char*)pObj->m_web_cgi_interpreter.c_str());
     }
 
-    if (m_web_cgi_patterns.length()) {
+    if (pObj->m_web_cgi_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_CGI_PATTERN + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_cgi_patterns.c_str());
+          vscp_strdup((const char*)pObj->m_web_cgi_patterns.c_str());
     }
 
-    if (m_web_cgi_environment.length()) {
+    if (pObj->m_web_cgi_environment.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_CGI_ENVIRONMENT + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_cgi_environment.c_str());
+          vscp_strdup((const char*)pObj->m_web_cgi_environment.c_str());
     }
 
-    if (m_web_protect_uri.length()) {
+    if (pObj->m_web_protect_uri.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_PROTECT_URI + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_protect_uri.c_str());
+          vscp_strdup((const char*)pObj->m_web_protect_uri.c_str());
     }
 
-    if (m_web_trottle.length()) {
+    if (pObj->m_web_trottle.length()) {
         web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_TROTTLE + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_trottle.c_str());
+          vscp_strdup((const char*)pObj->m_web_trottle.c_str());
     }
 
-    if (!m_web_enable_directory_listing) {
+    if (!pObj->m_web_enable_directory_listing) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_DIRECTORY_LISTING + 4);
         web_options[pos++] = vscp_strdup("no");
     }
 
-    if (m_web_enable_keep_alive) {
+    if (pObj->m_web_enable_keep_alive) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_KEEP_ALIVE + 4);
         web_options[pos++] = vscp_strdup("yes");
     }
 
-    if (m_web_keep_alive_timeout_ms !=
+    if (pObj->m_web_keep_alive_timeout_ms !=
         atol(VSCPDB_CONFIG_DEFAULT_WEB_KEEP_ALIVE_TIMEOUT_MS)) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_web_ssl_protocol_version);
+          vscp_str_format(("%ld"), (long)pObj->m_web_ssl_protocol_version);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_KEEP_ALIVE_TIMEOUT_MS + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (m_web_access_control_list.length()) {
+    if (pObj->m_web_access_control_list.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_LIST + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_access_control_list.c_str());
+          vscp_strdup((const char*)pObj->m_web_access_control_list.c_str());
     }
 
-    if (m_web_extra_mime_types.length()) {
+    if (pObj->m_web_extra_mime_types.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_EXTRA_MIME_TYPES + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_extra_mime_types.c_str());
+          vscp_strdup((const char*)pObj->m_web_extra_mime_types.c_str());
     }
 
-    if (m_web_num_threads !=
+    if (pObj->m_web_num_threads !=
         atoi(VSCPDB_CONFIG_DEFAULT_WEB_NUM_THREADS)) {
         std::string str =
-          vscp_str_format(("%d"), (int)m_web_num_threads);
+          vscp_str_format(("%d"), (int)pObj->m_web_num_threads);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_EXTRA_MIME_TYPES + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (m_web_url_rewrite_patterns.length()) {
+    if (pObj->m_web_url_rewrite_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_URL_REWRITE_PATTERNS + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_url_rewrite_patterns.c_str());
+          vscp_strdup((const char*)pObj->m_web_url_rewrite_patterns.c_str());
     }
 
-    if (m_web_hide_file_patterns.length()) {
+    if (pObj->m_web_hide_file_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_URL_REWRITE_PATTERNS + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_hide_file_patterns.c_str());
+          vscp_strdup((const char*)pObj->m_web_hide_file_patterns.c_str());
     }
 
-    if (m_web_request_timeout_ms !=
+    if (pObj->m_web_request_timeout_ms !=
         atol(VSCPDB_CONFIG_DEFAULT_WEB_REQUEST_TIMEOUT_MS)) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_web_request_timeout_ms);
+          vscp_str_format(("%ld"), (long)pObj->m_web_request_timeout_ms);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_REQUEST_TIMEOUT_MS + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (-1 != m_web_linger_timeout_ms) {
+    if (-1 != pObj->m_web_linger_timeout_ms) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_web_linger_timeout_ms);
+          vscp_str_format(("%ld"), (long)pObj->m_web_linger_timeout_ms);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LINGER_TIMEOUT_MS + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (!m_web_decode_url) {
+    if (!pObj->m_web_decode_url) {
         web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DECODE_URL + 4);
         web_options[pos++] = vscp_strdup("no");
     }
 
-    if (m_web_global_auth_file.length()) {
+    if (pObj->m_web_global_auth_file.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_GLOBAL_AUTHFILE + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_global_auth_file.c_str());
+          vscp_strdup((const char*)pObj->m_web_global_auth_file.c_str());
     }
 
-    if (m_web_per_directory_auth_file.length()) {
+    if (pObj->m_web_per_directory_auth_file.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_PER_DIRECTORY_AUTH_FILE + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_per_directory_auth_file.c_str());
+          (const char*)pObj->m_web_per_directory_auth_file.c_str());
     }
 
-    if (m_web_ssi_patterns.length()) {
+    if (pObj->m_web_ssi_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSI_PATTERNS + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_ssi_patterns.c_str());
+          vscp_strdup((const char*)pObj->m_web_ssi_patterns.c_str());
     }
 
-    if (m_web_access_control_allow_origin.length()) {
+    if (pObj->m_web_access_control_allow_origin.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_ORIGIN + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_access_control_allow_origin.c_str());
+          (const char*)pObj->m_web_access_control_allow_origin.c_str());
     }
 
-    if (m_web_access_control_allow_methods.length()) {
+    if (pObj->m_web_access_control_allow_methods.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_METHODS + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_access_control_allow_methods.c_str());
+          (const char*)pObj->m_web_access_control_allow_methods.c_str());
     }
 
-    if (m_web_access_control_allow_headers.length()) {
+    if (pObj->m_web_access_control_allow_headers.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_HEADERS + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_access_control_allow_headers.c_str());
+          (const char*)pObj->m_web_access_control_allow_headers.c_str());
     }
 
-    if (m_web_error_pages.length()) {
+    if (pObj->m_web_error_pages.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ERROR_PAGES + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_error_pages.c_str());
+          vscp_strdup((const char*)pObj->m_web_error_pages.c_str());
     }
 
-    if (-1 != m_web_tcp_nodelay) {
+    if (-1 != pObj->m_web_tcp_nodelay) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_web_tcp_nodelay);
+          vscp_str_format(("%ld"), (long)pObj->m_web_tcp_nodelay);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_TCP_NO_DELAY + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (m_web_static_file_cache_control.length()) {
+    if (pObj->m_web_static_file_cache_control.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ERROR_PAGES + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_static_file_cache_control.c_str());
+          (const char*)pObj->m_web_static_file_cache_control.c_str());
     }
 
-    if (m_web_static_file_max_age !=
+    if (pObj->m_web_static_file_max_age !=
         atol(VSCPDB_CONFIG_DEFAULT_WEB_STATIC_FILE_MAX_AGE)) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_web_static_file_max_age);
+          vscp_str_format(("%ld"), (long)pObj->m_web_static_file_max_age);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_STATIC_FILE_MAX_AGE + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (-1 != m_web_strict_transport_security_max_age) {
+    if (-1 != pObj->m_web_strict_transport_security_max_age) {
         std::string str =
           vscp_str_format(("%ld"),
-                          (long)m_web_strict_transport_security_max_age);
+                          (long)pObj->m_web_strict_transport_security_max_age);
         web_options[pos++] = vscp_strdup(
           VSCPDB_CONFIG_NAME_WEB_STRICT_TRANSPORT_SECURITY_MAX_AGE + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (!m_web_allow_sendfile_call) {
+    if (!pObj->m_web_allow_sendfile_call) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ALLOW_SENDFILE_CALL + 4);
         web_options[pos++] = vscp_strdup("no");
     }
 
-    if (m_web_additional_header.length()) {
+    if (pObj->m_web_additional_header.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ADDITIONAL_HEADERS + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_additional_header.c_str());
+          vscp_strdup((const char*)pObj->m_web_additional_header.c_str());
     }
 
-    if (m_web_max_request_size !=
+    if (pObj->m_web_max_request_size !=
         atol(VSCPDB_CONFIG_DEFAULT_WEB_MAX_REQUEST_SIZE)) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_web_max_request_size);
+          vscp_str_format(("%ld"), (long)pObj->m_web_max_request_size);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_MAX_REQUEST_SIZE + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (m_web_allow_index_script_resource) {
+    if (pObj->m_web_allow_index_script_resource) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ALLOW_INDEX_SCRIPT_RESOURCE + 4);
         web_options[pos++] = vscp_strdup("yes");
     }
 
-    if (m_web_duktape_script_patterns.length()) {
+    if (pObj->m_web_duktape_script_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DUKTAPE_SCRIPT_PATTERN + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_duktape_script_patterns.c_str());
+          (const char*)pObj->m_web_duktape_script_patterns.c_str());
     }
 
-    if (m_web_lua_preload_file.length()) {
+    if (pObj->m_web_lua_preload_file.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_PRELOAD_FILE + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_lua_preload_file.c_str());
+          vscp_strdup((const char*)pObj->m_web_lua_preload_file.c_str());
     }
 
-    if (m_web_lua_script_patterns.length()) {
+    if (pObj->m_web_lua_script_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_SCRIPT_PATTERN + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_lua_script_patterns.c_str());
+          vscp_strdup((const char*)pObj->m_web_lua_script_patterns.c_str());
     }
 
-    if (m_web_lua_server_page_patterns.length()) {
+    if (pObj->m_web_lua_server_page_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_SERVER_PAGE_PATTERN + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_lua_server_page_patterns.c_str());
+          (const char*)pObj->m_web_lua_server_page_patterns.c_str());
     }
 
-    if (m_web_lua_websocket_patterns.length()) {
+    if (pObj->m_web_lua_websocket_patterns.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_WEBSOCKET_PATTERN + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_lua_websocket_patterns.c_str());
+          vscp_strdup((const char*)pObj->m_web_lua_websocket_patterns.c_str());
     }
 
-    if (m_web_lua_background_script.length()) {
+    if (pObj->m_web_lua_background_script.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_BACKGROUND_SCRIPT + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_web_lua_background_script.c_str());
+          vscp_strdup((const char*)pObj->m_web_lua_background_script.c_str());
     }
 
-    if (m_web_lua_background_script_params.length()) {
+    if (pObj->m_web_lua_background_script_params.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_BACKGROUND_SCRIPT_PARAMS + 4);
         web_options[pos++] = vscp_strdup(
-          (const char*)m_web_lua_background_script_params.c_str());
+          (const char*)pObj->m_web_lua_background_script_params.c_str());
     }
 
-    if (m_websocket_document_root.length()) {
+    if (pObj->m_websocket_document_root.length()) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_DOCUMENT_ROOT + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)m_websocket_document_root.c_str());
+          vscp_strdup((const char*)pObj->m_websocket_document_root.c_str());
     }
 
-    if (m_websocket_timeout_ms !=
+    if (pObj->m_websocket_timeout_ms !=
         atol(VSCPDB_CONFIG_DEFAULT_WEBSOCKET_TIMEOUT_MS)) {
         std::string str =
-          vscp_str_format(("%ld"), (long)m_websocket_timeout_ms);
+          vscp_str_format(("%ld"), (long)pObj->m_websocket_timeout_ms);
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_TIMEOUT_MS + 4);
         web_options[pos++] = vscp_strdup((const char*)str.c_str());
     }
 
-    if (bEnable_websocket_ping_pong) {
+    if (pObj->bEnable_websocket_ping_pong) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_PING_PONG_ENABLE + 4);
         web_options[pos++] = vscp_strdup("yes");
@@ -3415,7 +3266,7 @@ start_webserver(void)
     //     web_options[pos++] =
     //       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_WEBSOCKET_PATTERN + 4);
     //     web_options[pos++] =
-    //       vscp_strdup((const char*)lua_websocket_pattern.c_str());
+    //       vscp_strdup((const char*)pObj->lua_websocket_pattern.c_str());
     // }
 
     // Mark end
@@ -3429,7 +3280,7 @@ start_webserver(void)
     callbacks.log_access  = log_access;
 
     // Start server
-    m_web_ctx = mg_start(&callbacks, 0, (const char**)web_options);
+    pObj->m_web_ctx = mg_start(&callbacks, cbdata, (const char**)web_options);
 
     // Delete allocated option data
     pos = 0;
@@ -3443,152 +3294,114 @@ start_webserver(void)
     delete[] web_options;
 
     // Check return value:
-    if (NULL == m_web_ctx) {
+    if (NULL == pObj->m_web_ctx) {
         syslog(LOG_ERR, "websrv: Cannot start webserver - web_start failed.");
         return EXIT_FAILURE;
     }
 
-    // The web examples enables some Civitweb test code
+    // The web examples enables some Civetweb test code
 
 #ifdef WEB_EXAMPLES
 
     // Add handler EXAMPLE_URI, to explain the example
-    mg_set_request_handler(m_web_ctx, EXAMPLE_URI, ExampleHandler, 0);
-    mg_set_request_handler(m_web_ctx, EXIT_URI, ExitHandler, 0);
+    mg_set_request_handler(pObj->m_web_ctx, EXAMPLE_URI, ExampleHandler, cbdata);
+    mg_set_request_handler(pObj->m_web_ctx, EXIT_URI, ExitHandler, cbdata);
 
     // Add handler for /A* and special handler for /A/B
-    mg_set_request_handler(m_web_ctx, "/A", AHandler, 0);
-    mg_set_request_handler(m_web_ctx, "/A/B", ABHandler, 0);
+    mg_set_request_handler(pObj->m_web_ctx, "/A", AHandler, cbdata);
+    mg_set_request_handler(pObj->m_web_ctx, "/A/B", ABHandler, cbdata);
 
     // Add handler for /B, /B/A, /B/B but not for /B*
-    mg_set_request_handler(m_web_ctx, "/B$", BXHandler, (void*)0);
-    mg_set_request_handler(m_web_ctx, "/B/A$", BXHandler, (void*)1);
-    mg_set_request_handler(m_web_ctx, "/B/B$", BXHandler, (void*)2);
+    mg_set_request_handler(pObj->m_web_ctx, "/B$", BXHandler, (void*)0);
+    mg_set_request_handler(pObj->m_web_ctx, "/B/A$", BXHandler, (void*)1);
+    mg_set_request_handler(pObj->m_web_ctx, "/B/B$", BXHandler, (void*)2);
 
     // Add handler for all files with .foo extention
-    mg_set_request_handler(m_web_ctx, "**.foo$", FooHandler, 0);
+    mg_set_request_handler(pObj->m_web_ctx, "**.foo$", FooHandler, cbdata);
 
     // Add handler for /close extention
-    mg_set_request_handler(m_web_ctx, "/close", CloseHandler, 0);
+    mg_set_request_handler(pObj->m_web_ctx, "/close", CloseHandler, cbdata);
 
     // Add handler for /cookie example
-    mg_set_request_handler(m_web_ctx, "/cookie", CookieHandler, 0);
+    mg_set_request_handler(pObj->m_web_ctx, "/cookie", CookieHandler, cbdata);
 
     // Add handler for /postresponse example
-    mg_set_request_handler(m_web_ctx, "/postresponse", PostResponser, 0);
+    mg_set_request_handler(pObj->m_web_ctx, "/postresponse", PostResponser, cbdata);
 
     // Add HTTP site to open a websocket connection
-    mg_set_request_handler(m_web_ctx,
+    mg_set_request_handler(pObj->m_web_ctx,
                            "/websocket",
                            WebSocketStartHandler,
-                           0);
+                           cbdata);
 
-    if (!m_bWebsocketsEnable) {
+    if (!pObj->m_bEnableWebsockets) {
         // WS site for the websocket connection
-        mg_set_websocket_handler(m_web_ctx,
+        mg_set_websocket_handler(pObj->m_web_ctx,
                                  "/websocket",
                                  WebSocketConnectHandler,
                                  WebSocketReadyHandler,
                                  WebsocketDataHandler,
                                  WebSocketCloseHandler,
-                                 0);
+                                 cbdata);
     }
 
 #endif // WEB_EXAMPLES
 
     // Add handler for form data
-    // mg_set_request_handler(m_web_ctx,
+    // mg_set_request_handler(pObj->m_web_ctx,
     //                         "/handle_form.embedded_c.example.callback",
     //                         FormHandler,
-    //                         (void *)0);
+    //                         cbdata);
 
     // Add a file upload handler for parsing files on the fly
-    // mg_set_request_handler(m_web_ctx,
+    // mg_set_request_handler(pObj->m_web_ctx,
     //                         "/on_the_fly_form",
     //                         FileUploadForm,
     //                         (void *)"/on_the_fly_form.md5.callback");
-    // mg_set_request_handler(m_web_ctx,
+    // mg_set_request_handler(pObj->m_web_ctx,
     //                         "/on_the_fly_form.md5.callback",
     //                         CheckSumHandler,
-    //                         (void *)0);
+    //                         cbdata);
 
     // Add handler for /form  (serve a file outside the document root)
-    mg_set_request_handler(m_web_ctx,
+    mg_set_request_handler(pObj->m_web_ctx,
                            "/form",
                            FileHandler,
                            (void*)"../../test/form.html");
 
-    // Set authorization handlers
-    if (m_enableWebAdminIf) {
-        mg_set_auth_handler(m_web_ctx,
-                            "/vscp",
-                            check_admin_authorization,
-                            NULL);
-    }
-
-    if (m_bEnableRestApi) {
-        mg_set_auth_handler(m_web_ctx,
+    if (pObj->m_bEnableRestApi) {
+        mg_set_auth_handler(pObj->m_web_ctx,
                             "/vscp/rest",
                             check_rest_authorization,
-                            NULL);
+                            cbdata);
     }
 
-    if (m_bWebsocketsEnable) {
+    if (pObj->m_bEnableWebsockets) {
         // WS1 path for the websocket connection
-        mg_set_websocket_handler(m_web_ctx,
+        mg_set_websocket_handler(pObj->m_web_ctx,
                                  "/ws1",
                                  ws1_connectHandler,
                                  ws1_readyHandler,
                                  ws1_dataHandler,
                                  ws1_closeHandler,
-                                 0);
+                                 cbdata);
 
         // WS2 path for the websocket connection
-        mg_set_websocket_handler(m_web_ctx,
+        mg_set_websocket_handler(pObj->m_web_ctx,
                                  "/ws2",
                                  ws2_connectHandler,
                                  ws2_readyHandler,
                                  ws2_dataHandler,
                                  ws2_closeHandler,
-                                 0);
-    }
-
-    // Set page handlers for admin i/f
-    if (m_enableWebAdminIf) {
-        mg_set_request_handler(m_web_ctx, "/vscp", vscp_mainpage, 0);
-        mg_set_request_handler(m_web_ctx,
-                               "/vscp/session",
-                               vscp_client,
-                               0);
-        mg_set_request_handler(m_web_ctx,
-                               "/vscp/configure",
-                               vscp_configure_list,
-                               0);
-        mg_set_request_handler(m_web_ctx,
-                               "/vscp/interfaces",
-                               vscp_interface,
-                               0);
-        mg_set_request_handler(m_web_ctx,
-                               "/vscp/ifinfo",
-                               vscp_interface_info,
-                               0);
-        mg_set_request_handler(m_web_ctx,
-                               "/vscp/password",
-                               vscp_password,
-                               0);
-        mg_set_request_handler(m_web_ctx,
-                               "/vscp/restart",
-                               vscp_restart,
-                               0);
-        mg_set_request_handler(m_web_ctx, "/vscp/log", vscp_log, 0);
+                                 cbdata);
     }
 
     // REST
-    if (m_bEnableRestApi) {
-        mg_set_request_handler(m_web_ctx,
+    if (pObj->m_bEnableRestApi) {
+        mg_set_request_handler(pObj->m_web_ctx,
                                "/vscp/rest",
                                websrv_restapi,
-                               0);
+                               cbdata);
     }
 
     return 1;
@@ -3599,10 +3412,13 @@ start_webserver(void)
 //
 
 int
-stop_webserver(void)
+stop_webserver(void *cbdata)
 {
+    CWebObj *pObj = (CWebObj *)cbdata;
+    if (NULL == cbdata) return WEB_ERROR; 
+
     // Stop the web server
-    mg_stop(m_web_ctx);
+    mg_stop(pObj->m_web_ctx);
 
     // Exit web-server interface
     mg_exit_library();

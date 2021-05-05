@@ -30,7 +30,8 @@
 #define VSCP_WEBSRV_H__INCLUDED_
 
 #include <userlist.h>
-#include <websocket.h>
+#include <clientlist.h>
+//#include <websocket.h>
 
 #include <map>
 #include <string>
@@ -298,9 +299,10 @@ websrv_parseHeader(std::map<std::string,std::string> &hdrmap, std::string &heade
   @return True on success.
 */
 bool
-websrv_getHeaderElement(std::map<std::string, std::string> &hdrmap,
-                        const std::string &name,
-                        std::string &value);
+websrv_getHeaderElement(std::map<std::string, 
+                          std::string> &hdrmap,
+                          const std::string &name,
+                          std::string &value);
 
 /*!
     This class implement the VSCP Webserver thread

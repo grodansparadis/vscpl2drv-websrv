@@ -27,3 +27,7 @@
 #define MINOR_VERSION       0
 #define RELEASE_VERSION     0
 #define BUILD_VERSION       0
+
+#define DISPLAY_VERSION "15.0.0.0"
+#define COPYRIGHT       "Copyright (c) 2000-2021 Ake Hedman, the VSCP Project"
+#define COPYRIGHT_HTML  "Copyright (c) 2000-2021 Ake Hedman, the VSCP Project"

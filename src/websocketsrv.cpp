@@ -231,7 +231,7 @@ websock_authentication(struct mg_connection* conn,
     }
 
     memset(buf, 0, sizeof(buf));
-    AES_CBC_decrypt_buffer(AES128, buf, secret, len, pSession->m_pParent->m_systemKey, iv);
+    AES_CBC_decrypt_buffer(AES128, buf, secret, len, pSession->m_pParent->m_vscp_key, iv);
 
     std::string str = std::string((const char*)buf);
     std::deque<std::string> tokens;

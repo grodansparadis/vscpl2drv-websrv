@@ -1553,8 +1553,8 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Trottle:</b> ");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(pObj->m_web_trottle).c_str());
-    if (!pObj->m_web_trottle.length()) {
+              (const char*)std::string(pObj->m_web_throttle).c_str());
+    if (!pObj->m_web_throttle.length()) {
         mg_printf(conn, "%s", "Not defined (default).");
     }
     mg_printf(conn, "<br>");
@@ -2995,10 +2995,10 @@ start_webserver(void *cbdata)
           vscp_strdup((const char*)pObj->m_web_protect_uri.c_str());
     }
 
-    if (pObj->m_web_trottle.length()) {
+    if (pObj->m_web_throttle.length()) {
         web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_TROTTLE + 4);
         web_options[pos++] =
-          vscp_strdup((const char*)pObj->m_web_trottle.c_str());
+          vscp_strdup((const char*)pObj->m_web_throttle.c_str());
     }
 
     if (!pObj->m_web_enable_directory_listing) {

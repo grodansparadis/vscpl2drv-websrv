@@ -42,7 +42,14 @@
 #include <clientlist.h>
 #include <guid.h>
 #include <vscp.h>
-//#include <websocket.h>
+
+#include <json.hpp>  // Needs C++11  -std=c++11
+
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+
+// https://github.com/nlohmann/json
+using json = nlohmann::json;
 
 // Seconds before trying to reconnect to a broken connection
 #define VSCP_WS1_DEFAULT_RECONNECT_TIME 30
@@ -96,6 +103,14 @@ class CWebObj
     bool handleHLO(vscpEvent* pEvent);
 
     /*!
+      Read in encryption key from disk
+      @param path Path to file that contains the 256 bit (32 byte) key on hexadecimal 
+        string form (do separator between hex numbers "001122..eeff").
+      @return true is returned on success, false otherwise.  
+    */
+    bool readEncryptionKey(const std::string& path);
+
+    /*!
       Load configuration if allowed to do so
     */
     bool doLoadConfig(void);
@@ -103,7 +118,7 @@ class CWebObj
     /*!
       Save configuration if allowed to do so
     */
-    bool doSaveConfig(void);
+    bool doSaveConfig(const std::string& path);
 
     /*!
         Put event on receive queue and signal
@@ -127,11 +142,14 @@ class CWebObj
 
   public:
 
+    /// Parsed Config file
+    json m_j_config;
+
     /// Debug flag
     bool m_bDebug;
 
     /// Write flags
-    bool m_bAllowWrite;
+    bool m_bWriteEnable;
 
     /// Run flag
     bool m_bQuit;
@@ -139,32 +157,33 @@ class CWebObj
     // Our GUID
     cguid m_guid;
 
-    // The system encryption key
-    uint8_t m_systemKey[32];
+    // The default random encryption key
+    uint8_t m_vscp_key[32] = {
+        0x2d, 0xbb, 0x07, 0x9a, 0x38, 0x98, 0x5a, 0xf0, 0x0e, 0xbe, 0xef, 0xe2, 0x2f, 0x9f, 0xfa, 0x0e,
+        0x7f, 0x72, 0xdf, 0x06, 0xeb, 0xe4, 0x45, 0x63, 0xed, 0xf4, 0xa1, 0x07, 0x3c, 0xab, 0xc7, 0xd4
+    };
+
+    /////////////////////////////////////////////////////////
+    //                      Logging
+    /////////////////////////////////////////////////////////
+    
+    bool m_bEnableFileLog;                    // True to enable logging
+    spdlog::level::level_enum m_fileLogLevel; // log level
+    std::string m_fileLogPattern;             // log file pattern
+    std::string m_path_to_log_file;           // Path to logfile      
+    uint32_t m_max_log_size;                  // Max size for logfile before rotating occures 
+    uint16_t m_max_log_files;                 // Max log files to keep
+
+    // ------------------------------------------------------------------------
 
     // Path to configuration file
     std::string m_path;
 
-    /// server supplied host
-    std::string m_hostRemote;
-
-    /// Server supplied port
-    int m_portRemote;
-
-    /// Server supplied username
-    std::string m_usernameRemote;
-
-    /// Server supplied password
-    std::string m_passwordRemote;
-
-    /// Send channel id
-    uint32_t txChannelID;
-
     /// Filter for receive
-    vscpEventFilter m_rxfilter;
+    vscpEventFilter m_filterIn;
 
     /// Filter for transmitt
-    vscpEventFilter m_txfilter;
+    vscpEventFilter m_filterOut;
 
     // TCP/IP link response timeout
     uint32_t m_responseTimeout;
@@ -172,8 +191,6 @@ class CWebObj
     /// Worker threads
     pthread_t m_pthreadSend;
     pthread_t m_pthreadReceive;
-
-    // =========================================================================
 
     //*****************************************************
     //               webserver interface
@@ -191,7 +208,12 @@ class CWebObj
     std::string m_web_listening_ports;
     std::string m_web_index_files;
     std::string m_web_authentication_domain;
+
+    std::string m_access_log_file;
+    std::string m_error_log_file;
+
     bool m_enable_auth_domain_check;
+    
     std::string m_web_ssl_certificate;
     std::string m_web_ssl_certificate_chain;
     bool m_web_ssl_verify_peer;
@@ -202,11 +224,13 @@ class CWebObj
     std::string m_web_ssl_cipher_list;
     uint8_t m_web_ssl_protocol_version;
     bool m_web_ssl_short_trust;
+    
     std::string m_web_cgi_interpreter;
     std::string m_web_cgi_patterns;
     std::string m_web_cgi_environment;
+    
     std::string m_web_protect_uri;
-    std::string m_web_trottle;
+    std::string m_web_throttle;
     bool m_web_enable_directory_listing;
     bool m_web_enable_keep_alive;
     long m_web_keep_alive_timeout_ms;
@@ -233,7 +257,9 @@ class CWebObj
     std::string m_web_additional_header;
     long m_web_max_request_size;
     bool m_web_allow_index_script_resource;
-    std::string m_web_duktape_script_patterns;
+
+    std::string m_web_duktape_script_patterns;  // *
+
     std::string m_web_lua_preload_file;
     std::string m_web_lua_script_patterns;
     std::string m_web_lua_server_page_patterns;
@@ -278,11 +304,12 @@ class CWebObj
     // List of active websocket sessions
     std::list<websock_session*> m_websocketSessions;
 
-    // =========================================================================
-
     //**************************************************************************
     //                                USERS
     //**************************************************************************
+
+    /// Path to file that holds users
+    std::string m_pathUsers;
 
     // The list of users
     CUserList m_userList;

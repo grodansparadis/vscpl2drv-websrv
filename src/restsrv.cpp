@@ -57,7 +57,6 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "web_css.h"
@@ -361,7 +360,7 @@ restsrv_error(struct mg_connection* conn,
     CWebObj *pObj = (CWebObj *)cbdata;
     if (NULL == cbdata) return; 
 
-    syslog(LOG_DEBUG,
+    spdlog::get("logger")->debug(
                "REST: error format=%d errorcode=%d",
                format,
                errorcode);
@@ -461,12 +460,12 @@ restsrv_get_session(struct mg_connection* conn, std::string& sid, void *cbdata)
 
     // Check pointers
     if (!conn || !(reqinfo = mg_get_request_info(conn))) {
-        syslog(LOG_ERR, "REST: get_session, Pointer error.");
+        spdlog::get("logger")->error( "REST: get_session, Pointer error.");
         return NULL;
     }
 
     if (0 == sid.length()) {
-        syslog(LOG_ERR, "REST: get_session, sid length is zero.");
+        spdlog::get("logger")->error( "REST: get_session, sid length is zero.");
         return NULL;
     }
 
@@ -480,13 +479,13 @@ restsrv_get_session(struct mg_connection* conn, std::string& sid, void *cbdata)
         if (0 == strcmp((const char*)sid.c_str(), pSession->m_sid)) {
             pSession->m_lastActiveTime = time(NULL);
             pthread_mutex_unlock(&pObj->m_mutex_restSession);
-            syslog(LOG_DEBUG, "REST: get_session, Session found.");
+            spdlog::get("logger")->debug( "REST: get_session, Session found.");
             return pSession;
         }
     }
     pthread_mutex_unlock(&pObj->m_mutex_restSession);
 
-    syslog(LOG_ERR, "REST: get_session, Session not found.");
+    spdlog::get("logger")->error( "REST: get_session, Session not found.");
     return NULL;
 }
 
@@ -503,7 +502,7 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbda
 
     // Check pointers
     if (!conn || !(reqinfo = mg_get_request_info(conn))) {
-        syslog(LOG_ERR, "REST: add_session, Pointer error.");
+        spdlog::get("logger")->error( "REST: add_session, Pointer error.");
         return 0;
     }
 
@@ -515,7 +514,7 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbda
     if (0) {
         const char* pheader = mg_get_header(conn, "Authorization");
         if (NULL == pheader) {
-            syslog(LOG_ERR, "REST: add_session, No 'Authorization' header.");
+            spdlog::get("logger")->error( "REST: add_session, No 'Authorization' header.");
             return NULL;
         }
 
@@ -525,7 +524,7 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbda
 
         // Get username
         if (!websrv_getHeaderElement(hdrmap, "username", user)) {
-            syslog(LOG_ERR, "REST: add_session, no 'username' in header.");
+            spdlog::get("logger")->error( "REST: add_session, no 'username' in header.");
             return NULL;
         }
     }
@@ -533,7 +532,7 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbda
     // Create fresh session
     pSession = new struct restsrv_session;
     if (NULL == pSession) {
-        syslog(LOG_ERR, "REST: add_session, unable to create session object.");
+        spdlog::get("logger")->error( "REST: add_session, unable to create session object.");
         return NULL;
     }
     memset(pSession, 0, sizeof(websrv_session));
@@ -552,7 +551,7 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbda
 
     pSession->m_pClientItem = new CClientItem(); // Create client
     if (NULL == pSession->m_pClientItem) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[restsrv] New session: Unable to create client object.");
         delete pSession;
         return NULL;
@@ -575,7 +574,7 @@ restsrv_add_session(struct mg_connection* conn, CUserItem* pUserItem, void *cbda
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
         pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "REST server: new session, Failed to add client. Terminating "
                "thread.");
         return NULL;
@@ -615,7 +614,7 @@ restsrv_expire_sessions(struct mg_connection* conn, void *cbdata)
             struct restsrv_session* pSession = *it;
             if ((now - pSession->m_lastActiveTime) > (60 * 60)) {
                 it = pObj->m_rest_sessions.erase(it);
-                syslog(LOG_DEBUG, "REST: Session expired");
+                spdlog::get("logger")->debug( "REST: Session expired");
                 delete pSession;
             } 
             else {
@@ -623,7 +622,7 @@ restsrv_expire_sessions(struct mg_connection* conn, void *cbdata)
             }
         }
     } catch (...) {
-        syslog(LOG_ERR, "Exception expire_session");
+        spdlog::get("logger")->error( "Exception expire_session");
     }
 
     pthread_mutex_unlock(&pObj->m_mutex_restSession);
@@ -659,7 +658,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     // Check pointer
     if (!conn || !(ctx = mg_get_context(conn)) ||
         !(reqinfo = mg_get_request_info(conn))) {
-        syslog(LOG_ERR, "REST: restapi - invalid pointers");
+        spdlog::get("logger")->error( "REST: restapi - invalid pointers");
         return WEB_ERROR;
     }
 
@@ -890,7 +889,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
                  REST_PLAIN_ERROR_UNSUPPORTED_FORMAT,
                  strlen(REST_PLAIN_ERROR_UNSUPPORTED_FORMAT));
         mg_write(conn, "", 0); // Terminator
-        syslog(LOG_DEBUG, "REST: restapi - invalid format ");
+        spdlog::get("logger")->debug( "REST: restapi - invalid format ");
         return WEB_ERROR;
     }
 
@@ -914,7 +913,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
                               std::string(reqinfo->remote_addr).c_str(),
                               (const char*)keypairs[("VSCPUSER")].c_str());
 
-            syslog(LOG_ERR, "%s", strErr.c_str());
+            spdlog::get("logger")->error( "%s", strErr.c_str());
 
             restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_USER, cbdata);
 
@@ -935,7 +934,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
               reqinfo->remote_addr,
               (const char*)keypairs["VSCPUSER"].c_str());
 
-            syslog(LOG_ERR, "%s", strErr.c_str());
+            spdlog::get("logger")->error( "%s", strErr.c_str());
 
             restsrv_error(conn,
                           pSession,
@@ -960,7 +959,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
               (const char*)keypairs["VSCPUSER"].c_str(),
               reqinfo->remote_addr);
 
-            syslog(LOG_ERR, "%s", strErr.c_str());
+            spdlog::get("logger")->error( "%s", strErr.c_str());
 
             restsrv_error(conn,
                           pSession,
@@ -979,7 +978,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
               ("[REST Client] Unable to create new session for user [%s]\n"),
               (const char*)keypairs[("VSCPUSER")].c_str());
 
-            syslog(LOG_ERR, "%s", strErr.c_str());
+            spdlog::get("logger")->error( "%s", strErr.c_str());
 
             restsrv_error(conn,
                           pSession,
@@ -992,7 +991,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
 
         // Only the "open" command is allowed here
         if (("1" == keypairs["OP"]) || ("OPEN" == keypairs["OP"])) {
-            syslog(LOG_DEBUG, "REST: restapi - doOpen format=%ld", format);
+            spdlog::get("logger")->debug( "REST: restapi - doOpen format=%ld", format);
             restsrv_doOpen(conn, pSession, format, cbdata);
             return WEB_OK;
         }
@@ -1003,7 +1002,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
           "[REST Client] Unable to create new session for user [%s]",
           (const char*)keypairs[("VSCPUSER")].c_str());
 
-        syslog(LOG_ERR, "%s", strErr.c_str());
+        spdlog::get("logger")->error( "%s", strErr.c_str());
 
         restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_ORIGIN, cbdata);
 
@@ -1023,7 +1022,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
           std::string(reqinfo->remote_addr).c_str(),
           (const char*)keypairs[("VSCPUSER")].c_str());
 
-        syslog(LOG_ERR, "%s", strErr.c_str());
+        spdlog::get("logger")->error( "%s", strErr.c_str());
 
         restsrv_error(conn, pSession, format, REST_ERROR_CODE_INVALID_ORIGIN, cbdata);
 
@@ -1038,7 +1037,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
       ("[REST Client] User [%s] Host [%s] allowed to connect. \n"),
       (const char*)keypairs[("VSCPUSER")].c_str(),
       std::string(reqinfo->remote_addr).c_str());
-    syslog(LOG_DEBUG, "%s", strErr.c_str());
+    spdlog::get("logger")->debug( "%s", strErr.c_str());
 
     //   *************************************************************
     //   * * * * * * * *  Status (hold session open)   * * * * * * * *
@@ -1047,7 +1046,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         try {
             restsrv_doStatus(conn, pSession, format, cbdata);
         } catch (...) {
-            syslog(LOG_ERR, "REST: Exception occurred doing restsrv_doStatus");
+            spdlog::get("logger")->error( "REST: Exception occurred doing restsrv_doStatus");
         }
     }
 
@@ -1058,7 +1057,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         try {
             restsrv_doOpen(conn, pSession, format, cbdata);
         } catch (...) {
-            syslog(LOG_ERR, "REST: Exception occurred doing restsrv_doOpen");
+            spdlog::get("logger")->error( "REST: Exception occurred doing restsrv_doOpen");
         }
 
     }
@@ -1070,7 +1069,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         try {
             restsrv_doClose(conn, pSession, format, cbdata);
         } catch (...) {
-            syslog(LOG_ERR, "REST: Exception occurred doing restsrv_doClose");
+            spdlog::get("logger")->error( "REST: Exception occurred doing restsrv_doClose");
         }
     }
 
@@ -1085,7 +1084,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
                 vscp_convertStringToEvent(&vscpevent, keypairs[("VSCPEVENT")]);
                 restsrv_doSendEvent(conn, pSession, format, &vscpevent, cbdata);
             } catch (...) {
-                syslog(LOG_ERR,
+                spdlog::get("logger")->error(
                        "REST: Exception occurred doing restsrv_doSendEvent");
             }
         } else {
@@ -1106,7 +1105,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         try {
             restsrv_doReceiveEvent(conn, pSession, format, count, cbdata);
         } catch (...) {
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "REST: Exception occurred doing restsrv_doReceiveEvent");
         }
     }
@@ -1135,7 +1134,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         try {
             restsrv_doSetFilter(conn, pSession, format, vscpfilter, cbdata);
         } catch (...) {
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "REST: Exception occurred doing restsrv_doSetFilter");
         }
 
@@ -1149,7 +1148,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
         try {
             restsrv_doClearQueue(conn, pSession, format, cbdata);
         } catch (...) {
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "REST: Exception occurred doing restsrv_doClearQueue");
         }
     }
@@ -1180,9 +1179,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
                                            keypairs[("SUBZONE")],
                                            cbdata);
             } catch (...) {
-                syslog(
-                  LOG_ERR,
-                  "REST: Exception occurred doing restsrv_doWriteMeasurement");
+                spdlog::get("logger")->error("REST: Exception occurred doing restsrv_doWriteMeasurement");
             }
         } else {
             restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
@@ -1198,7 +1195,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
             try {
                 restsrv_doFetchMDF(conn, pSession, format, keypairs[("URL")], cbdata);
             } catch (...) {
-                syslog(LOG_ERR,
+                spdlog::get("logger")->error(
                        "REST: Exception occurred doing restsrv_doFetchMDF");
             }
         } else {
@@ -1209,7 +1206,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
     // Unrecognised operation
 
     else {
-        syslog(LOG_ERR, "REST: restapi - Missing data.");
+        spdlog::get("logger")->error( "REST: restapi - Missing data.");
         restsrv_error(conn, pSession, format, REST_ERROR_CODE_MISSING_DATA, cbdata);
     }
 
@@ -1711,7 +1708,7 @@ restsrv_doSendEvent(struct mg_connection* conn,
 
                 // There must be room in the send queue
                 if (pObj->m_maxItemsInClientReceiveQueue >
-                    /*pObj->m_mutexSendQueue.size() TODO*/ 0) {
+                    /*pObj->m_mutexSendQueue.size() TODO:*/ 0) {
 
                     vscpEvent* pNewEvent = new (vscpEvent);
                     if (NULL != pNewEvent) {

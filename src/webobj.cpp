@@ -31,7 +31,6 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include <ctype.h>
@@ -54,7 +53,6 @@
 #include <vscp_type.h>
 #include <vscpdatetime.h>
 #include <vscphelper.h>
-//#include <websocket.h>
 #include <websrv.h>
 
 #include "webobj.h"
@@ -118,9 +116,6 @@ CWebObj::~CWebObj()
 
     pthread_mutex_destroy(&m_mutexSendQueue);
     pthread_mutex_destroy(&m_mutexReceiveQueue);
-
-    // Close syslog channel
-    closelog();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -159,8 +154,8 @@ CWebObj::open(std::string& path, const cguid& guid)
 
     // Read configuration file
     if (!doLoadConfig()) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-template] Failed to load configuration file [%s]",
+        spdlog::get("logger")->error(
+               "[vscpl2drv-websrv] Failed to load configuration file [%s]",
                path.c_str());
     }
 
@@ -169,20 +164,20 @@ CWebObj::open(std::string& path, const cguid& guid)
         start_webserver();
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception when starting web server");
+        spdlog::get("logger")->error( "[vscpl2drv-websrv] Exception when starting web server");
         return false;
     }
 
     // start the workerthread
     if (pthread_create(&m_pthreadSend, NULL, workerThreadSend, this)) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-template] Unable to start send worker thread.");
+        spdlog::get("logger")->error(
+               "[vscpl2drv-websrv] Unable to start send worker thread.");
         return false;
     }
 
     if (pthread_create(&m_pthreadReceive, NULL, workerThreadReceive, this)) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-template] Unable to start receive worker thread.");
+        spdlog::get("logger")->error(
+               "[vscpl2drv-websrv] Unable to start receive worker thread.");
         return false;
     }
 
@@ -197,8 +192,7 @@ void
 CWebObj::close(void)
 {
     // Do nothing if already terminated
-    if (m_bQuit)
-        return;
+    if (m_bQuit) return;
 
     m_bQuit = true; // terminate the thread
     sleep(1);       // Give the thread some time to terminate
@@ -1044,21 +1038,20 @@ CWebObj::doLoadConfig(void)
 // {
 //     // Check pointers
 //     if (NULL == inbuf) {
-//         syslog(
-//           LOG_ERR,
-//           "[vscpl2drv-template] HLO parser: HLO in-buffer pointer is NULL.");
+//         spdlog::get("logger")->error(
+//           "[vscpl2drv-websrv] HLO parser: HLO in-buffer pointer is NULL.");
 //         return false;
 //     }
 
 //     if (NULL == phlo) {
-//         syslog(LOG_ERR,
-//                "[vscpl2drv-template] HLO parser: HLO obj pointer is NULL.");
+//         spdlog::get("logger")->error(
+//                "[vscpl2drv-websrv] HLO parser: HLO obj pointer is NULL.");
 //         return false;
 //     }
 
 //     if (!size) {
-//         syslog(LOG_ERR,
-//                "[vscpl2drv-template] HLO parser: HLO buffer size is zero.");
+//         spdlog::get("logger")->error(
+//                "[vscpl2drv-websrv] HLO parser: HLO buffer size is zero.");
 //         return false;
 //     }
 
@@ -1072,7 +1065,7 @@ CWebObj::doLoadConfig(void)
 //     memcpy(buf, inbuf, size);
 
 //     if (!XML_ParseBuffer(xmlParser, size, size == 0)) {
-//         syslog(LOG_ERR, "[vscpl2drv-template] Failed parse XML setup.");
+//         spdlog::get("logger")->error( "[vscpl2drv-websrv] Failed parse XML setup.");
 //         XML_ParserFree(xmlParser);
 //         return false;
 //     }
@@ -1095,8 +1088,8 @@ CWebObj::doLoadConfig(void)
     
 //     fp = fopen(m_path.c_str(), "r");
 //     if (NULL == fp) {
-//         syslog(LOG_ERR,
-//                "[vscpl2drv-template] Failed to open configuration file [%s]",
+//         spdlog::get("logger")->error(
+//                "[vscpl2drv-websrv] Failed to open configuration file [%s]",
 //                m_path.c_str());
 //         return false;
 //     }
@@ -1111,7 +1104,7 @@ CWebObj::doLoadConfig(void)
 //     file_size = fread(buf, sizeof(char), XML_BUFF_SIZE, fp);
 
 //     if (!XML_ParseBuffer(xmlParser, file_size, file_size == 0)) {
-//         syslog(LOG_ERR, "[vscpl2drv-template] Failed parse XML setup.");
+//         spdlog::get("logger")->error( "[vscpl2drv-websrv] Failed parse XML setup.");
 //         XML_ParserFree(xmlParser);
 //         return false;
 //     }
@@ -1166,15 +1159,15 @@ CWebObj::doLoadConfig(void)
     
 //     fp = fopen(m_path.c_str(), "w");
 //     if (NULL == fp) {
-//         syslog(LOG_ERR,
-//                "[vscpl2drv-template] Failed to open configuration file [%s] for write",
+//         spdlog::get("logger")->error(
+//                "[vscpl2drv-websrv] Failed to open configuration file [%s] for write",
 //                m_path.c_str());
 //         return false;
 //     }
 
 //     if ( strlen(buf) != fwrite( buf, sizeof(char), strlen(buf), fp ) ) {
-//         syslog(LOG_ERR,
-//                "[vscpl2drv-template] Failed to write configuration file [%s] ",
+//         spdlog::get("logger")->error(
+//                "[vscpl2drv-websrv] Failed to write configuration file [%s] ",
 //                m_path.c_str());
 //         fclose (fp);       
 //         return false;
@@ -1196,14 +1189,14 @@ CWebObj::doLoadConfig(void)
 
 //     // Check pointers
 //     if (NULL == pEvent) {
-//         syslog(LOG_ERR,
-//                "[vscpl2drv-template] HLO handler: NULL event pointer.");
+//         spdlog::get("logger")->error(
+//                "[vscpl2drv-websrv] HLO handler: NULL event pointer.");
 //         return false;
 //     }
 
 //     CHLO hlo;
 //     if (!parseHLO(pEvent->sizeData, pEvent->pdata, &hlo)) {
-//         syslog(LOG_ERR, "[vscpl2drv-template] Failed to parse HLO.");
+//         spdlog::get("logger")->error( "[vscpl2drv-websrv] Failed to parse HLO.");
 //         return false;
 //     }
 
@@ -1402,8 +1395,8 @@ CWebObj::eventExToReceiveQueue(vscpEventEx& ex)
 {
     vscpEvent* pev = new vscpEvent();
     if (!vscp_convertEventExToEvent(pev, &ex)) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-template] Failed to convert event from ex to ev.");
+        spdlog::get("logger")->error(
+               "[vscpl2drv-websrv] Failed to convert event from ex to ev.");
         vscp_deleteEvent(pev);
         return false;
     }
@@ -1417,8 +1410,8 @@ CWebObj::eventExToReceiveQueue(vscpEventEx& ex)
             vscp_deleteEvent(pev);
         }
     } else {
-        syslog(LOG_ERR,
-               "[vscpl2drv-template] Unable to allocate event storage.");
+        spdlog::get("logger")->error(
+               "[vscpl2drv-websrv] Unable to allocate event storage.");
     }
     return true;
 }
@@ -1459,7 +1452,7 @@ retry_send_connect:
     //                                 pObj->m_portRemote,
     //                                 pObj->m_usernameRemote,
     //                                 pObj->m_passwordRemote)) {
-    //     syslog(LOG_ERR,
+    //     spdlog::get("logger")->error(
     //            "%s %s ",
     //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //            (const char*)"Error while opening remote VSCP TCP/IP "
@@ -1476,7 +1469,7 @@ retry_send_connect:
     //     goto retry_send_connect;
     // }
 
-    // syslog(LOG_ERR,
+    // spdlog::get("logger")->error(
     //        "%s %s ",
     //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //        (const char*)"Connect to remote VSCP TCP/IP interface [SEND].");
@@ -1492,7 +1485,7 @@ retry_send_connect:
     //         if (!bRemoteConnectionLost) {
     //             bRemoteConnectionLost = true;
     //             pObj->m_srvRemoteSend.doCmdClose();
-    //             syslog(LOG_ERR,
+    //             spdlog::get("logger")->error(
     //                    "%s %s ",
     //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //                    (const char*)"Lost connection to remote host [SEND].");
@@ -1506,7 +1499,7 @@ retry_send_connect:
     //                                         pObj->m_portRemote,
     //                                         pObj->m_usernameRemote,
     //                                         pObj->m_passwordRemote)) {
-    //             syslog(LOG_ERR,
+    //             spdlog::get("logger")->error(
     //                    "%s %s ",
     //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //                    (const char*)"Reconnected to remote host [SEND].");
@@ -1559,7 +1552,7 @@ retry_send_connect:
     // // Close the channel
     // pObj->m_srvRemoteSend.doCmdClose();
 
-    // syslog(LOG_ERR,
+    // spdlog::get("logger")->error(
     //        "%s %s ",
     //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //        (const char*)"Disconnect from remote VSCP TCP/IP interface [SEND].");
@@ -1595,7 +1588,7 @@ retry_receive_connect:
     //                                         pObj->m_portRemote,
     //                                         pObj->m_usernameRemote,
     //                                         pObj->m_passwordRemote)) {
-    //     syslog(LOG_ERR,
+    //     spdlog::get("logger")->error(
     //            "%s %s ",
     //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //            (const char*)"Error while opening remote VSCP TCP/IP "
@@ -1612,7 +1605,7 @@ retry_receive_connect:
     //     goto retry_receive_connect;
     // }
 
-    // syslog(LOG_ERR,
+    // spdlog::get("logger")->error(
     //        "%s %s ",
     //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //        (const char*)"Connect to remote VSCP TCP/IP interface [RECEIVE].");
@@ -1620,7 +1613,7 @@ retry_receive_connect:
     // // Set receive filter
     // if (VSCP_ERROR_SUCCESS !=
     //     pObj->m_srvRemoteReceive.doCmdFilter(&pObj->m_rxfilter)) {
-    //     syslog(LOG_ERR,
+    //     spdlog::get("logger")->error(
     //            "%s %s ",
     //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //            (const char*)"Failed to set receiving filter.");
@@ -1641,7 +1634,7 @@ retry_receive_connect:
 
     //             bRemoteConnectionLost = true;
     //             pObj->m_srvRemoteReceive.doCmdClose();
-    //             syslog(LOG_ERR, "%s %s ", VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
+    //             spdlog::get("logger")->error( "%s %s ", VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //                         (const char*)"Lost connection to remote host [Receive].");
     //         }
 
@@ -1653,7 +1646,7 @@ retry_receive_connect:
     //                                                 pObj->m_portRemote,
     //                                                 pObj->m_usernameRemote,
     //                                                 pObj->m_passwordRemote)) {
-    //             syslog(LOG_ERR,
+    //             spdlog::get("logger")->error(
     //                    "%s %s ",
     //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //                    (const char*)"Reconnected to remote host [Receive].");
@@ -1696,9 +1689,7 @@ retry_receive_connect:
     // // Close the channel
     // pObj->m_srvRemoteReceive.doCmdClose();
 
-    // syslog(
-    //   LOG_ERR,
-    //   "%s %s ",
+    // spdlog::get("logger")->error("%s %s ",
     //   VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
     //   (const char*)"Disconnect from remote VSCP TCP/IP interface [RECEIVE].");
 

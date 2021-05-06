@@ -52,7 +52,6 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
-#include <syslog.h>
 #include <unistd.h>
 
 // For version and copyright info
@@ -538,8 +537,7 @@ websrv_add_session(struct mg_connection* conn, void* cbdata)
 
     pSession->m_pClientItem = new CClientItem(); // Create client
     if (NULL == pSession->m_pClientItem) {
-        syslog(LOG_ERR,
-               "[websrv] New session: Unable to create client object.");
+        spdlog::get("logger")->critical("[websrv] New session: Unable to create client object.");
         delete pSession;
         return NULL;
     }
@@ -561,8 +559,7 @@ websrv_add_session(struct mg_connection* conn, void* cbdata)
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
         pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
-        syslog(LOG_ERR,
-               ("WEB server: Failed to add client. Terminating thread."));
+        spdlog::get("logger")->error("[websrv]  Failed to add client. Terminating thread.");
         return NULL;
     }
     pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
@@ -657,8 +654,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // Check pointers
     if (!conn || !(ctx = mg_get_context(conn)) ||
         !(reqinfo = mg_get_request_info(conn))) {
-        syslog(LOG_ERR,
-               "[websrv] check_admin_authorization: Pointers are invalid.");
+        spdlog::get("logger")->error("[websrv] check_admin_authorization: Pointers are invalid.");
         return WEB_ERROR;
     }
 
@@ -668,7 +664,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // // Get admin user
     // if (NULL ==
     //     (pUserItem = m_userList.getUser(pObj->m_admin_user.c_str()))) {
-    //     syslog(LOG_ERR,
+    //     spdlog::get("logger")->error(
     //            "[websrv] check_admin_authorization: Admin user [%s] i not "
     //            "available.",
     //            m_admin_user.c_str());
@@ -679,9 +675,8 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if ((NULL == (auth_header = mg_get_header(conn, "Authorization"))) ||
         (vscp_strncasecmp(auth_header, "Basic ", 6) != 0)) {
-        syslog(LOG_ERR,
-               "[websrv] check_admin_authorization: Authorization header or "
-               "digest missing for admin log in.");
+        spdlog::get("logger")->error("[websrv] check_admin_authorization: Authorization header or "
+                                        "digest missing for admin log in.");
         //mg_send_basic_access_authentication_request(conn, NULL); 1.13
         mg_send_digest_access_authentication_request(conn,NULL);
         return 401;
@@ -692,9 +687,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     const struct mg_request_info* pri = mg_get_request_info(conn);
     if (NULL == pri) {
-        syslog(
-          LOG_ERR,
-          "[websrv] check_admin_authorization: Failed to to get request info.");
+        spdlog::get("logger")->error("[websrv] check_admin_authorization: Failed to to get request info.");
         return WEB_ERROR;
     }
 
@@ -730,11 +723,10 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if (NULL == pUserItem) {
         // Password is not correct
-        syslog(LOG_ERR,
-               "[Webserver Client] Use on host [%s] NOT "
-               "allowed connect. User [%s]. Wrong user/password",
-               (const char*)reqinfo->remote_addr,
-               (const char*)pUserItem->getUserName().c_str());
+        spdlog::get("logger")->error("[websrv] Use on host [%s] NOT "
+                                        "allowed connect. User [%s]. Wrong user/password",
+                                        (const char*)reqinfo->remote_addr,
+                                        (const char*)pUserItem->getUserName().c_str());
         //mg_send_basic_access_authentication_request(conn, NULL); 1.13
         mg_send_digest_access_authentication_request(conn,NULL);
         return 401;
@@ -747,11 +739,10 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
         // Host is not allowed to connect
-        syslog(LOG_ERR,
-               "[Webserver Client] Host [%s] "
-               "NOT allowed to connect. User [%s]",
-               (const char*)reqinfo->remote_addr,
-               (const char*)pUserItem->getUserName().c_str());
+        spdlog::get("logger")->error("[websrv] Host [%s] "
+                                        "NOT allowed to connect. User [%s]",
+                                        (const char*)reqinfo->remote_addr,
+                                        (const char*)pUserItem->getUserName().c_str());
         // mg_send_basic_access_authentication_request(conn, NULL); 1.13
         mg_send_digest_access_authentication_request(conn,NULL);
         return 401;
@@ -783,7 +774,7 @@ check_rest_authorization(struct mg_connection* conn, void* cbdata)
 static int
 log_message(const struct mg_connection* conn, const char* message)
 {
-    syslog(LOG_INFO, "[websrv] %s", message);
+    spdlog::get("logger")->info("[websrv] %s", message);
     return WEB_OK;
 }
 
@@ -794,7 +785,7 @@ log_message(const struct mg_connection* conn, const char* message)
 static int
 log_access(const struct mg_connection* conn, const char* message)
 {
-    // TODO
+    // TODO:
     return WEB_OK;
 }
 
@@ -1270,7 +1261,7 @@ vscp_log(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, WEB_LOGLIST_TR_HEAD);
 
     std::string line;
-    std::ifstream logFile("/var/log/syslog");
+    std::ifstream logFile("/var/log/syslog");  // TODO: change path
     while (!logFile.fail() && !logFile.eof() && getline(logFile, line)) {
         if (std::string::npos != line.find("vscpd:")) {
             mg_printf(conn, "<tr><td>%s</td></tr>", line.c_str());
@@ -2851,21 +2842,21 @@ init_ssl(void* ssl_context, void* user_data)
 int
 start_webserver(void *cbdata)
 {
-    syslog(LOG_DEBUG, ("Starting web server..."));
+    spdlog::get("logger")->debug("[websrv] Starting web server...");
 
     if (NULL != cbdata) {
-        syslog(LOG_ERR, ("No user data supplied. The webserver need this. Aborting!"));
+        spdlog::get("logger")->error("[websrv] No user data supplied. The webserver need this. Aborting!");
         return EXIT_FAILURE;
     }
 
     CWebObj *pObj = (CWebObj *)cbdata;  
 
     if (pObj->m_bEnableWebsockets) {
-        syslog(LOG_ERR, ("Websockets enable...\n"));
+        spdlog::get("logger")->debug("[websrv] Websockets enable...");
     }
 
     if (pObj->m_bEnableRestApi) {
-        syslog(LOG_ERR, ("REST API enable...\n"));
+        spdlog::get("logger")->debug("[websrv] REST API enable...");
     }
 
     // This structure must be larger than the number of options to set
@@ -3295,7 +3286,7 @@ start_webserver(void *cbdata)
 
     // Check return value:
     if (NULL == pObj->m_web_ctx) {
-        syslog(LOG_ERR, "websrv: Cannot start webserver - web_start failed.");
+        spdlog::get("logger")->error("[websrv]  Cannot start webserver - web_start failed.");
         return EXIT_FAILURE;
     }
 

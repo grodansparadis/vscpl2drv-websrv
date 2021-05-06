@@ -34,7 +34,6 @@
 #include <float.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include <json.hpp> // Needs C++11  -std=c++11
 
@@ -177,7 +176,7 @@ int
 lua_vscp_log(struct lua_State* L)
 {
     std::string msg;
-    uint8_t type = LOG_ERR;
+    uint8_t type = 0;  // TODO:
     uint8_t __attribute__((unused)) level = 0;
 
     int nArgs = lua_gettop(L);
@@ -221,7 +220,8 @@ lua_vscp_log(struct lua_State* L)
         type = lua_tointeger(L, 3);
     }
 
-    syslog(type, "%s", msg.c_str());
+    // TODO:   spdlog::get("logger")->error(
+    // syslog(type, "%s", msg.c_str());
 
     return 1;
 }
@@ -336,7 +336,7 @@ lua_vscp_base64_decode(struct lua_State* L)
 //
 // result = escapexml(string)
 //
-// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+// TODO: 
 
 int
 lua_vscp_escapexml(struct lua_State* L)
@@ -364,7 +364,7 @@ lua_vscp_escapexml(struct lua_State* L)
         return 1;
     }
 
-    // TODO
+    // TODO:
     pstr = pstr;
 
     return 1;
@@ -1280,7 +1280,7 @@ lua_vscp_getCountEvent(struct lua_State* L)
         return luaL_error(L, "vscp.getCountEvent: VSCP server client not found.");
     }
 
-    // if (pObj->m_bOpen) {     TODO
+    // if (pObj->m_bOpen) {     TODO:
     //     count = pObj->m_receiveList.size();
     // } else {
     //     count = 0;
@@ -1381,7 +1381,7 @@ lua_vscp_setFilter(struct lua_State* L)
     }
 
     // Set the filter
-    //vscp_copyVSCPFilter(&pObj->m_filter, &filter);  TODO
+    //vscp_copyVSCPFilter(&pObj->m_filter, &filter);  TODO:
 
     return 1;
 }
@@ -1642,7 +1642,7 @@ lua_send_Measurement(struct lua_State* L)
     }
 
     // Send the event
-    // if (!pObj->sendEvent(pObj, pEvent)) {  TODO
+    // if (!pObj->sendEvent(pObj, pEvent)) {  TODO:
     //     // Failed to send event
     //     vscp_deleteEvent_v2(&pEvent);
     //     return luaL_error(L,

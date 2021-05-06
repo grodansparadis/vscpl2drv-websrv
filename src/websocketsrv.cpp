@@ -56,7 +56,6 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "web_css.h"
@@ -207,14 +206,14 @@ websock_authentication(struct mg_connection* conn,
     // Check pointers
     if ((NULL == conn) || (NULL == pSession) || !(ctx = mg_get_context(conn)) ||
         !(reqinfo = mg_get_request_info(conn))) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: Invalid "
                "pointers. ");
         return false;
     }
 
     if (0 == vscp_hexStr2ByteArray(iv, 16, (const char*)strIV.c_str())) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: No room "
                "for iv block. ");
         return false; // Not enough room in buffer
@@ -224,7 +223,7 @@ websock_authentication(struct mg_connection* conn,
     if (0 == (len = vscp_hexStr2ByteArray(secret,
                                           strCrypto.length(),
                                           (const char*)strCrypto.c_str()))) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: No room "
                "for crypto block. ");
         return false; // Not enough room in buffer
@@ -239,7 +238,7 @@ websock_authentication(struct mg_connection* conn,
 
     // Get username
     if (tokens.empty()) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: Missing "
                "username from client. ");
         return false; // No username
@@ -251,7 +250,7 @@ websock_authentication(struct mg_connection* conn,
 
     // Get password
     if (tokens.empty()) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: Missing "
                "password from client. ");
         return false; // No username
@@ -264,7 +263,7 @@ websock_authentication(struct mg_connection* conn,
     // Check if user is valid
     CUserItem* pUserItem = pSession->m_pParent->m_userList.getUser(strUser);
     if (NULL == pUserItem) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: CUserItem "
                "allocation problem ");
         return false;
@@ -275,7 +274,7 @@ websock_authentication(struct mg_connection* conn,
 
     if (!bValidHost) {
         // Log valid login
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: Host "
                "[%s] NOT allowed to connect.",
                reqinfo->remote_addr);
@@ -283,7 +282,7 @@ websock_authentication(struct mg_connection* conn,
     }
 
     if (!vscp_isPasswordValid(pUserItem->getPassword(), strPassword)) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket Client] Authentication: User %s at host "
                "[%s] gave wrong password.",
                (const char*)strUser.c_str(),
@@ -302,7 +301,7 @@ websock_authentication(struct mg_connection* conn,
            sizeof(vscpEventFilter));
 
     // Log valid login
-    syslog(LOG_ERR,
+    spdlog::get("logger")->error(
            "[Websocket Client] Authentication: Host [%s] "
            "User [%s] allowed to connect.",
            reqinfo->remote_addr,
@@ -342,7 +341,7 @@ websock_new_session(const struct mg_connection* conn)
     // create fresh session
     pSession = new websock_session;
     if (NULL == pSession) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websockets] New session: Unable to create session object.");
         return NULL;
     }
@@ -366,7 +365,7 @@ websock_new_session(const struct mg_connection* conn)
 
     pSession->m_pClientItem = new CClientItem(); // Create client
     if (NULL == pSession->m_pClientItem) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websockets] New session: Unable to create client object.");
         delete pSession;
         return NULL;
@@ -389,7 +388,7 @@ websock_new_session(const struct mg_connection* conn)
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
         pthread_mutex_unlock(&pSession->m_pParent->m_clientList.m_mutexItemList);
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                ("Websocket server: Failed to add client. Terminating thread."));
         return NULL;
     }
@@ -418,17 +417,17 @@ websock_sendevent(struct mg_connection* conn,
 {
     // Check pointer
     if (NULL == conn) {
-        syslog(LOG_ERR,"Internal error: websock_sendevent - conn == NULL");
+        spdlog::get("logger")->error("Internal error: websock_sendevent - conn == NULL");
         return false;
     }
     
     if (NULL == pSession) {
-        syslog(LOG_ERR,"Internal error: websock_sendevent - pSession == NULL");
+        spdlog::get("logger")->error("Internal error: websock_sendevent - pSession == NULL");
         return false;
     }
 
     if (NULL == pex) {
-        syslog(LOG_ERR,"Internal error: websock_sendevent - pEvent == NULL");
+        spdlog::get("logger")->error("Internal error: websock_sendevent - pEvent == NULL");
         return false;
     }
 
@@ -490,7 +489,7 @@ websock_post_incomingEvents(const websock_session* pSession)
 
                     std::string str;
                     if (vscp_convertEventToString(str, pEvent)) {
-                        syslog(LOG_DEBUG,
+                        spdlog::get("logger")->debug(
                                    "Received ws event %s",
                                    str.c_str());
 
@@ -560,7 +559,7 @@ ws1_connectHandler(const struct mg_connection* conn, void* cbdata)
 
     mg_unlock_context(ctx);
 
-    syslog(LOG_ERR,
+    spdlog::get("logger")->error(
                "[Websocket ws1] WS1 Connection: client %s",
                (reject ? "rejected" : "accepted"));
 
@@ -669,7 +668,7 @@ ws1_dataHandler(struct mg_connection* conn,
     switch (((unsigned char)bits) & 0x0F) {
 
         case MG_WEBSOCKET_OPCODE_CONTINUATION:
-            syslog(LOG_DEBUG, "Websocket WS1 - opcode = Continuation");
+            spdlog::get("logger")->debug( "Websocket WS1 - opcode = Continuation");
 
             // Save and concatenate mesage
             pSession->m_strConcatenated += std::string(data, len);
@@ -685,7 +684,7 @@ ws1_dataHandler(struct mg_connection* conn,
                     }
                 }
                 catch (...) {
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "ws1: Exception occurred ws1_message concat");
                 }
             }
@@ -693,7 +692,7 @@ ws1_dataHandler(struct mg_connection* conn,
 
         // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
         case MG_WEBSOCKET_OPCODE_TEXT:
-            syslog(LOG_DEBUG,
+            spdlog::get("logger")->debug(
                        "Websocket WS1 - opcode = text[%s]",
                        strWsPkt.c_str());
             if (1 & bits) {
@@ -704,7 +703,7 @@ ws1_dataHandler(struct mg_connection* conn,
                     }
                 }
                 catch (...) {
-                    syslog(LOG_ERR, "ws1: Exception occurred ws1_message");
+                    spdlog::get("logger")->error( "ws1: Exception occurred ws1_message");
                 }
             }
             else {
@@ -714,20 +713,20 @@ ws1_dataHandler(struct mg_connection* conn,
             break;
 
         case MG_WEBSOCKET_OPCODE_BINARY:
-            syslog(LOG_DEBUG, "Websocket WS1 - opcode = BINARY");
+            spdlog::get("logger")->debug( "Websocket WS1 - opcode = BINARY");
             break;
 
         case MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE:
-            syslog(LOG_DEBUG, "Websocket WS1 - opcode = Connection close");
+            spdlog::get("logger")->debug( "Websocket WS1 - opcode = Connection close");
             break;
 
         case MG_WEBSOCKET_OPCODE_PING:
-            syslog(LOG_DEBUG, "Websocket WS1 - Ping received/Pong sent,");
+            spdlog::get("logger")->debug( "Websocket WS1 - Ping received/Pong sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PONG, NULL, 0);
             break;
 
         case MG_WEBSOCKET_OPCODE_PONG:
-            syslog(LOG_DEBUG, "Websocket WS2 - Pong received/Pung sent,");
+            spdlog::get("logger")->debug( "Websocket WS2 - Pong received/Pung sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PING, NULL, 0);
             break;
 
@@ -769,7 +768,7 @@ ws1_message(struct mg_connection* conn,
                 ws1_command(conn, pSession, strWsPkt, cbdata);
             }
             catch (...) {
-                syslog(LOG_ERR, "ws1: Exception occurred ws1_command");
+                spdlog::get("logger")->error( "ws1: Exception occurred ws1_command");
                 str = vscp_str_format(("-;C;%d;%s"),
                                       (int)WEBSOCK_ERROR_GENERAL,
                                       WEBSOCK_STR_ERROR_GENERAL);
@@ -797,8 +796,7 @@ ws1_message(struct mg_connection* conn,
                                    (const char*)str.c_str(),
                                    str.length());
 
-                syslog(
-                  LOG_ERR,
+                spdlog::get("logger")->error(
                   "[Websocket ws1] User [%s] is not "
                   "authorised.\n",
                   pSession->m_pClientItem->m_pUserItem->getUserName().c_str());
@@ -819,8 +817,7 @@ ws1_message(struct mg_connection* conn,
                                    (const char*)str.c_str(),
                                    str.length());
 
-                syslog(
-                  LOG_ERR,
+                spdlog::get("logger")->error(
                   "[Websocket ws1] User [%s] is not "
                   "allowed to send events.\n",
                   pSession->m_pClientItem->m_pUserItem->getUserName().c_str());
@@ -856,8 +853,7 @@ ws1_message(struct mg_connection* conn,
                                            (const char*)str.c_str(),
                                            str.length());
 
-                        syslog(
-                          LOG_ERR,
+                        spdlog::get("logger")->error(
                           "[Websocket ws1] User [%s] is not "
                           "allowed to send events.\n",
                           pSession->m_pClientItem->m_pUserItem->getUserName()
@@ -883,8 +879,7 @@ ws1_message(struct mg_connection* conn,
                                            (const char*)str.c_str(),
                                            str.length());
 
-                        syslog(
-                          LOG_ERR,
+                        spdlog::get("logger")->error(
                           "[Websocket ws1] User [%s] is not "
                           "authorised to send CLASS1.PROTOCOL events.\n",
                           pSession->m_pClientItem->m_pUserItem->getUserName()
@@ -908,8 +903,7 @@ ws1_message(struct mg_connection* conn,
                                            (const char*)str.c_str(),
                                            str.length());
 
-                        syslog(
-                          LOG_ERR,
+                        spdlog::get("logger")->error(
                           "[Websocket ws1] User [%s] is not "
                           "authorised to send CLASS2.PROTOCOL events.\n",
                           pSession->m_pClientItem->m_pUserItem->getUserName()
@@ -933,8 +927,7 @@ ws1_message(struct mg_connection* conn,
                                            (const char*)str.c_str(),
                                            str.length());
 
-                        syslog(
-                          LOG_ERR,
+                        spdlog::get("logger")->error(
                           "[Websocket ws1] User [%s] is not "
                           "authorised to send CLASS2.HLO events.\n",
                           pSession->m_pClientItem->m_pUserItem->getUserName()
@@ -958,8 +951,7 @@ ws1_message(struct mg_connection* conn,
                                            (const char*)str.c_str(),
                                            str.length());
 
-                        syslog(
-                          LOG_ERR,
+                        spdlog::get("logger")->error(
                           "[websocket ws1] User [%s] is not allowed to "
                           "send event class=%d type=%d.",
                           pSession->m_pClientItem->m_pUserItem->getUserName()
@@ -976,7 +968,7 @@ ws1_message(struct mg_connection* conn,
                                            MG_WEBSOCKET_OPCODE_TEXT,
                                            "+;EVENT",
                                            7);
-                        syslog(LOG_ERR,
+                        spdlog::get("logger")->error(
                                    "[websocket ws1] Sent ws1 event %s",
                                    strWsPkt.c_str());
                     }
@@ -992,7 +984,7 @@ ws1_message(struct mg_connection* conn,
                 }
             }
             catch (...) {
-                syslog(LOG_ERR, "ws1: Exception occurred send event");
+                spdlog::get("logger")->error( "ws1: Exception occurred send event");
                 str = vscp_str_format(("-;E;%d;%s"),
                                       (int)WEBSOCK_ERROR_GENERAL,
                                       WEBSOCK_STR_ERROR_GENERAL);
@@ -1032,7 +1024,7 @@ ws1_command(struct mg_connection* conn,
 
     CWebObj *pObj = (CWebObj *)cbdata;    
 
-    syslog(LOG_ERR, "[Websocket ws1] Command = %s", strCmd.c_str());
+    spdlog::get("logger")->error( "[Websocket ws1] Command = %s", strCmd.c_str());
 
     std::deque<std::string> tokens;
     vscp_split(tokens, strCmd, ";");
@@ -1120,7 +1112,7 @@ ws1_command(struct mg_connection* conn,
             }
         }
         catch (...) {
-            syslog(LOG_ERR, "WS1: AUTH failed (syntax)");
+            spdlog::get("logger")->error( "WS1: AUTH failed (syntax)");
             str = vscp_str_format(("-;AUTH;%d;%s"),
                                   (int)WEBSOCK_ERROR_SYNTAX_ERROR,
                                   WEBSOCK_STR_ERROR_SYNTAX_ERROR);
@@ -1189,7 +1181,7 @@ ws1_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "[Websocket ws1] User/host not authorised to set a filter.");
 
             return; // We still leave channel open
@@ -1208,7 +1200,7 @@ ws1_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "[Websocket ws1] User [%s] not "
                    "allowed to set a filter.\n",
                    pSession->m_pClientItem->m_pUserItem->getUserName().c_str());
@@ -1322,8 +1314,7 @@ ws1_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(
-              LOG_ERR,
+            spdlog::get("logger")->error(
               "[Websocket ws1] User/host not authorised to clear the queue.");
 
             return; // We still leave channel open
@@ -1436,7 +1427,7 @@ ws1_command(struct mg_connection* conn,
         std::string strResult = ("+;WCYD;");;
         uint8_t capabilities[8];
 
-        //pSession->m_pParent->getVscpCapabilities(capabilities);  // TODO
+        //pSession->m_pParent->getVscpCapabilities(capabilities);  // TODO:
         strResult = vscp_str_format("%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
                                         capabilities[7],
                                         capabilities[6],
@@ -1488,7 +1479,7 @@ ws2_connectHandler(const struct mg_connection* conn, void* cbdata)
 
     mg_unlock_context(ctx);
 
-    syslog(LOG_ERR,
+    spdlog::get("logger")->error(
                "[Websocket ws2] WS2 Connection: client %s",
                (reject ? "rejected" : "accepted"));
 
@@ -1608,7 +1599,7 @@ ws2_dataHandler(struct mg_connection* conn,
 
         case MG_WEBSOCKET_OPCODE_CONTINUATION:
 
-            syslog(LOG_DEBUG, "Websocket WS2 - opcode = Continuation");
+            spdlog::get("logger")->debug( "Websocket WS2 - opcode = Continuation");
 
             // Save and concatenate mesage
             pSession->m_strConcatenated += std::string(data, len);
@@ -1624,7 +1615,7 @@ ws2_dataHandler(struct mg_connection* conn,
                     }
                 }
                 catch (...) {
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "ws1: Exception occurred ws2_message concat");
                 }
             }
@@ -1633,7 +1624,7 @@ ws2_dataHandler(struct mg_connection* conn,
         // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
         case MG_WEBSOCKET_OPCODE_TEXT:
 
-            syslog(LOG_DEBUG,
+            spdlog::get("logger")->debug(
                        "Websocket WS2 - opcode = Text [%s]",
                        strWsPkt.c_str());
 
@@ -1645,7 +1636,7 @@ ws2_dataHandler(struct mg_connection* conn,
                     }
                 }
                 catch (...) {
-                    syslog(LOG_ERR, "ws1: Exception occurred ws2_message");
+                    spdlog::get("logger")->error( "ws1: Exception occurred ws2_message");
                 }
             }
             else {
@@ -1655,20 +1646,20 @@ ws2_dataHandler(struct mg_connection* conn,
             break;
 
         case MG_WEBSOCKET_OPCODE_BINARY:
-            syslog(LOG_DEBUG, "Websocket WS2 - opcode = BINARY");
+            spdlog::get("logger")->debug( "Websocket WS2 - opcode = BINARY");
             break;
 
         case MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE:
-            syslog(LOG_DEBUG, "Websocket WS2 - Connection close");
+            spdlog::get("logger")->debug( "Websocket WS2 - Connection close");
             break;
 
         case MG_WEBSOCKET_OPCODE_PING:
-            syslog(LOG_DEBUG, "Websocket WS2 - Ping received/Pong sent,");
+            spdlog::get("logger")->debug( "Websocket WS2 - Ping received/Pong sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PONG, data, len);
             break;
 
         case MG_WEBSOCKET_OPCODE_PONG:
-            syslog(LOG_DEBUG, "Websocket WS2 - Pong received/Ping sent,");
+            spdlog::get("logger")->debug( "Websocket WS2 - Pong received/Ping sent,");
             mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PING, data, len);
             break;
 
@@ -1752,7 +1743,7 @@ ws2_message(struct mg_connection* conn,
                                        str.length());
 
                     // No arg found
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "Failed to parse ws2 websocket command object %s",
                            strWsPkt.c_str());
                     return false;
@@ -1768,7 +1759,7 @@ ws2_message(struct mg_connection* conn,
                                        str.c_str(),
                                        str.length());
 
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "Failed to parse ws2 websocket command object %s",
                            strWsPkt.c_str());
 
@@ -1800,7 +1791,7 @@ ws2_message(struct mg_connection* conn,
                                                    (const char*)str.c_str(),
                                                    str.length());
 
-                                syslog(LOG_ERR,
+                                spdlog::get("logger")->error(
                                        "[Websocket ws2] User [%s] is not "
                                        "allowed to login.\n",
                                        pSession->m_pClientItem->m_pUserItem
@@ -1834,7 +1825,7 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    syslog(LOG_ERR,
+                                    spdlog::get("logger")->error(
                                            "[Websocket ws2] User [%s] is not "
                                            "allowed to send events.\n",
                                            pSession->m_pClientItem->m_pUserItem
@@ -1864,7 +1855,7 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    syslog(LOG_ERR,
+                                    spdlog::get("logger")->error(
                                            "[Websocket ws2] User [%s] is not "
                                            "authorised to send CLASS1.PROTOCOL "
                                            "events.\n",
@@ -1893,7 +1884,7 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    syslog(LOG_ERR,
+                                    spdlog::get("logger")->error(
                                            "[Websocket ws2] User [%s] is not "
                                            "authorised to send CLASS2.PROTOCOL "
                                            "events.\n",
@@ -1920,7 +1911,7 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    syslog(LOG_ERR,
+                                    spdlog::get("logger")->error(
                                            "[Websocket ws2] User [%s] is not "
                                            "authorised to send CLASS2.HLO "
                                            "events.\n",
@@ -1948,8 +1939,7 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    syslog(
-                                      LOG_ERR,
+                                    spdlog::get("logger")->error(
                                       "websocket] User [%s] is not allowed to "
                                       "send event class=%d type=%d.",
                                       pSession->m_pClientItem->m_pUserItem
@@ -1972,7 +1962,7 @@ ws2_message(struct mg_connection* conn,
                                                        str.c_str(),
                                                        str.length());
 
-                                    syslog(LOG_ERR,
+                                    spdlog::get("logger")->error(
                                                "Sent ws2 event %s",
                                                strWsPkt.c_str());
                                 }
@@ -1987,7 +1977,7 @@ ws2_message(struct mg_connection* conn,
                                                        MG_WEBSOCKET_OPCODE_TEXT,
                                                        (const char*)str.c_str(),
                                                        str.length());
-                                    syslog(LOG_ERR,
+                                    spdlog::get("logger")->error(
                                            "Transmission buffer is full %s",
                                            strWsPkt.c_str());
 
@@ -2008,7 +1998,7 @@ ws2_message(struct mg_connection* conn,
                                        str.c_str(),
                                        str.length());
 
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "Failed to parse ws2 websocket event object %s",
                            strWsPkt.c_str());
 
@@ -2039,7 +2029,7 @@ ws2_message(struct mg_connection* conn,
                                        str.c_str(),
                                        str.length());
 
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "Failed to parse ws2 websocket + response object %s",
                            strWsPkt.c_str());
                     return true; // 'true' leave connection open
@@ -2069,7 +2059,7 @@ ws2_message(struct mg_connection* conn,
                                        str.c_str(),
                                        str.length());
 
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "Failed to parse ws2 websocket - response object %s",
                            strWsPkt.c_str());
                     return true; // 'true' leave connection open
@@ -2099,7 +2089,7 @@ ws2_message(struct mg_connection* conn,
                                        str.c_str(),
                                        str.length());
 
-                    syslog(LOG_ERR,
+                    spdlog::get("logger")->error(
                            "Failed to parse ws2 websocket variable object %s",
                            strWsPkt.c_str());
                     return true; // 'true' leave connection open
@@ -2118,7 +2108,7 @@ ws2_message(struct mg_connection* conn,
                                    str.length());
 
                 // This is a type we do not recognize
-                syslog(LOG_ERR,
+                spdlog::get("logger")->error(
                        "Unknown ws2 websocket type %s",
                        strWsPkt.c_str());
                 return true; // 'true' leave connection open
@@ -2135,7 +2125,7 @@ ws2_message(struct mg_connection* conn,
                            str.c_str(),
                            str.length());
 
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "Failed to parse ws2 websocket command %s",
                strWsPkt.c_str());
         return true; // 'true' leave connection open
@@ -2162,7 +2152,7 @@ ws2_command(struct mg_connection* conn,
 
     CWebObj *pObj = (CWebObj *)cbdata;
 
-    syslog(LOG_DEBUG, "[Websocket ws2] Command = %s", strCmd.c_str());
+    spdlog::get("logger")->debug( "[Websocket ws2] Command = %s", strCmd.c_str());
 
     // Get arguments
     std::map<std::string, std::string> argmap;
@@ -2183,7 +2173,7 @@ ws2_command(struct mg_connection* conn,
                            (const char*)str.c_str(),
                            str.length());
 
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Websocket ws2] SETFILTER parse error = %s",
                jsonObj.dump().c_str());
 
@@ -2330,8 +2320,7 @@ ws2_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(
-              LOG_ERR,
+            spdlog::get("logger")->error(
               "[Websocket w2] User/host is not authorised to set a filter.");
 
             return false; // We still leave channel open
@@ -2351,7 +2340,7 @@ ws2_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "[Websocket w2] User [%s] is not "
                    "allowed to set a filter.\n",
                    pSession->m_pClientItem->m_pUserItem->getUserName().c_str());
@@ -2378,7 +2367,7 @@ ws2_command(struct mg_connection* conn,
                                    (const char*)str.c_str(),
                                    str.length());
 
-                syslog(LOG_ERR,
+                spdlog::get("logger")->error(
                        "[Websocket w2] Set filter syntax error. [%s]",
                        strFilter.c_str());
 
@@ -2401,7 +2390,7 @@ ws2_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(LOG_ERR,
+            spdlog::get("logger")->error(
                    "[Websocket w2] Set filter syntax error. [%s]",
                    strFilter.c_str());
 
@@ -2437,8 +2426,7 @@ ws2_command(struct mg_connection* conn,
                                (const char*)str.c_str(),
                                str.length());
 
-            syslog(
-              LOG_ERR,
+            spdlog::get("logger")->error(
               "[Websocket w2] User/host is not authorised to clear the queue.");
 
             return false; // We still leave channel open
@@ -2566,7 +2554,7 @@ ws2_command(struct mg_connection* conn,
         std::string strResult;
         uint8_t capabilities[8];
 
-        //pSession->m_pParent->getVscpCapabilities(capabilities); TODO
+        //pSession->m_pParent->getVscpCapabilities(capabilities); TODO:
         strResult = vscp_str_format("%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
                                         capabilities[7],
                                         capabilities[6],
@@ -2591,7 +2579,7 @@ ws2_command(struct mg_connection* conn,
                                           strCmd,
                                           (int)WEBSOCK_ERROR_UNKNOWN_COMMAND,
                                           WEBSOCK_STR_ERROR_UNKNOWN_COMMAND);
-        syslog(LOG_ERR, "[Websocket w2] Unknown command [%s].", strCmd.c_str());
+        spdlog::get("logger")->error( "[Websocket w2] Unknown command [%s].", strCmd.c_str());
 
         return false;
     }
@@ -2619,7 +2607,7 @@ ws2_xcommand(struct mg_connection* conn,
 
     CWebObj *pObj = (CWebObj *)cbdata;
 
-    syslog(LOG_ERR, "[Websocket ws2] Command = %s", strCmd.c_str());
+    spdlog::get("logger")->error( "[Websocket ws2] Command = %s", strCmd.c_str());
 
     std::deque<std::string> tokens;
     vscp_split(tokens, strCmd, ";");

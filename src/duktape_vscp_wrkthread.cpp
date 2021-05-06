@@ -32,7 +32,6 @@
 #include <float.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include <actioncodes.h>
@@ -73,7 +72,7 @@ actionJavascriptThread(void *pData)
 {
     actionJavascriptObj *pActionObj = (actionJavascriptObj *)pData;
     if (NULL == pActionObj) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Javascript execution] - "
                "No control object, can't execute code.");
         return NULL;
@@ -103,7 +102,7 @@ actionJavascriptThread(void *pData)
     duk_put_prop_string(ctx, -2, "resolve");
     duk_push_c_function(ctx, js_load_module, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "load");
-    //duk_module_node_init(ctx);  // TODO external module support
+    //duk_module_node_init(ctx);  // TODO: external module support
 
     // Add VSCP methods
     duk_push_c_function(ctx, js_vscp_log, DUK_VARARGS);
@@ -196,7 +195,7 @@ actionJavascriptThread(void *pData)
         delete pActionObj->m_pClientItem;
         pActionObj->m_pClientItem = NULL;
         pthread_mutex_unlock(&pObj->m_mutex_clientList);
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Javascript execution] - Failed to add client. "
                "Terminating thread.");
         return NULL;
@@ -209,7 +208,7 @@ actionJavascriptThread(void *pData)
     // Execute the JavaScript
     duk_push_string(ctx, (const char *)pActionObj->m_strScript.c_str());
     if (0 != duk_peval(ctx)) {
-        syslog(LOG_ERR,
+        spdlog::get("logger")->error(
                "[Javascript execution] - JavaScript failed to execute: %s",
                duk_safe_to_string(ctx, -1));
     }

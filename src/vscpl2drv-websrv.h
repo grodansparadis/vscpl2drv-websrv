@@ -35,7 +35,6 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <canal.h>
-//#include <websocket.h>
 #include <canal_macro.h>
 #include <vscp.h>
 #include <hlo.h>

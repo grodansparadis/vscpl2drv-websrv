@@ -38,7 +38,6 @@
 #include <float.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include <json.hpp> // Needs C++11  -std=c++11
@@ -56,14 +55,18 @@
 #include <vscpremotetcpif.h>
 #include <clientlist.h>
 
-using namespace std;
+#include <json.hpp>  // Needs C++11  -std=c++11
+#include <mustache.hpp>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
 
-///////////////////////////////////////////////////
-//                  HELPERS
-///////////////////////////////////////////////////
+using namespace kainjow::mustache;
 
 ///////////////////////////////////////////////////////////////////////////////
 // get_js_Event
@@ -227,7 +230,7 @@ js_load_module(duk_context* ctx)
     const char* filename;
     const char* module_id;
 
-    // TODO Modules can only be loaded from /var/lib/vscp/javascript or
+    // TODO: Modules can only be loaded from /var/lib/vscp/javascript or
     // configured other location
 
     module_id = duk_require_string(ctx, 0);
@@ -286,7 +289,7 @@ js_vscp_log(duk_context* ctx)
 {
     //int nArgs = duk_get_top(ctx);
     std::string wxDebug = duk_get_string_default(ctx, -1, "---Log fail---");
-    syslog(LOG_INFO, "%s", wxDebug.c_str());
+    spdlog::get("logger")->info("%s", wxDebug.c_str());
 
     duk_pop_n(ctx, 1);        // Clear stack
     duk_push_boolean(ctx, 1); // Return success
@@ -548,8 +551,8 @@ js_vscp_writeVariable(duk_context* ctx)
     return JAVASCRIPT_OK;
 }
 
-// TODO  writevalue
-// TODO writeNote
+// TODO:  writevalue
+// TODO: writeNote
 
 ///////////////////////////////////////////////////////////////////////////////
 // js_vscp_deleteVariable
@@ -636,7 +639,7 @@ js_vscp_sendEvent(duk_context* ctx)
     }
     duk_pop_n(ctx, 2);
 
-    // if (!pObj->sendEvent(pEvent)) {  TODO
+    // if (!pObj->sendEvent(pEvent)) {  TODO:
     //     // Failed to send event
     //     vscp_deleteEvent_v2(&pEvent);
     //     duk_push_boolean(ctx, 0); // return code false
@@ -1090,7 +1093,7 @@ js_send_Measurement(duk_context* ctx)
     }
 
     // Send the event
-    // if (!pObj->sendEvent(pEvent)) {  // TODO
+    // if (!pObj->sendEvent(pEvent)) {  // TODO:
     //     // Failed to send event
     //     vscp_deleteEvent_v2(&pEvent);
     //     duk_push_boolean(ctx, 0); // return code failure

@@ -266,18 +266,21 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
     if (-1 == (rv = sem_timedwait(&pdrvObj->m_semReceiveQueue, &ts))) {
         if (ETIMEDOUT == errno) {
             return CANAL_ERROR_TIMEOUT;
-        } else if (EINTR == errno) {
-            syslog(LOG_ERR,
-                   "[vscpl2drv-template] Interrupted by a signal handler");
+        } 
+        else if (EINTR == errno) {
+            spdlog::get("logger")->error("[websrv] Interrupted by a signal handler");
             return CANAL_ERROR_INTERNAL;
-        } else if (EINVAL == errno) {
-            syslog(LOG_ERR, "[vscpl2drv-template] Invalid semaphore (timout)");
+        } 
+        else if (EINVAL == errno) {
+            spdlog::get("logger")->error("[websrv] Invalid semaphore (timout)");
             return CANAL_ERROR_INTERNAL;
-        } else if (EAGAIN == errno) {
-            syslog(LOG_ERR, "[vscpl2drv-template] Blocking error");
+        } 
+        else if (EAGAIN == errno) {
+            spdlog::get("logger")->error("[websrv] Blocking error");
             return CANAL_ERROR_INTERNAL;
-        } else {
-            syslog(LOG_ERR, "[vscpl2drv-template] Unknown error");
+        } 
+        else {
+            spdlog::get("logger")->error("[websrv] Unknown error");
             return CANAL_ERROR_INTERNAL;
         }
     }
@@ -286,8 +289,7 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
     vscpEvent* pLocalEvent = pdrvObj->m_receiveList.front();
     pdrvObj->m_receiveList.pop_front();
     pthread_mutex_unlock(&pdrvObj->m_mutexReceiveQueue);
-    if (NULL == pLocalEvent)
-        return CANAL_ERROR_MEMORY;
+    if (NULL == pLocalEvent) return CANAL_ERROR_MEMORY;
 
     vscp_copyEvent(pEvent, pLocalEvent);
     vscp_deleteEvent(pLocalEvent);

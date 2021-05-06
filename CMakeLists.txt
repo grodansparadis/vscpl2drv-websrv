@@ -45,7 +45,7 @@ if(NOT DEFINED PATCH_VERSION)
 endif()
 
 SET(CPACK_PACKAGE_DESCRIPTION "VSCP driver for tcp/ip server")
-SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "VSCP level II Driver for VSCP that export a server interface for the VSCP websocket 1/2 protocol")
+SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "VSCP level II Driver for VSCP that export a server interface for the VSCP web/rest and websocket 1/2 protocol")
 SET(CPACK_PACKAGE_VENDOR "the VSCP Project")
 SET(CPACK_PACKAGE_CONTACT "akhe@vscp.org")
 

@@ -41,6 +41,19 @@
 #include "vscpl2drv-websrv.h"
 #include "webobj.h"
 
+#include <json.hpp>  // Needs C++11  -std=c++11
+#include <mustache.hpp>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+// https://github.com/nlohmann/json
+using json = nlohmann::json;
+
+using namespace kainjow::mustache;
+
 void
 _init() __attribute__((constructor));
 void
@@ -268,19 +281,19 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
             return CANAL_ERROR_TIMEOUT;
         } 
         else if (EINTR == errno) {
-            spdlog::get("logger")->error("[websrv] Interrupted by a signal handler");
+            spdlog::get("logger")->error(" Interrupted by a signal handler");
             return CANAL_ERROR_INTERNAL;
         } 
         else if (EINVAL == errno) {
-            spdlog::get("logger")->error("[websrv] Invalid semaphore (timout)");
+            spdlog::get("logger")->error(" Invalid semaphore (timout)");
             return CANAL_ERROR_INTERNAL;
         } 
         else if (EAGAIN == errno) {
-            spdlog::get("logger")->error("[websrv] Blocking error");
+            spdlog::get("logger")->error(" Blocking error");
             return CANAL_ERROR_INTERNAL;
         } 
         else {
-            spdlog::get("logger")->error("[websrv] Unknown error");
+            spdlog::get("logger")->error(" Unknown error");
             return CANAL_ERROR_INTERNAL;
         }
     }

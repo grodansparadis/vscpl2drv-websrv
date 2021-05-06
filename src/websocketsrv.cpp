@@ -80,16 +80,22 @@
 #include <websocketsrv.h>
 
 
-//#include "websocket.h"
-
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#define XML_BUFF_SIZE 0xffff
+#include <json.hpp>  // Needs C++11  -std=c++11
+#include <mustache.hpp>
 
-// for convenience
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+// https://github.com/nlohmann/json
 using json = nlohmann::json;
+
+using namespace kainjow::mustache;
 
 ///////////////////////////////////////////////////
 //                 GLOBALS

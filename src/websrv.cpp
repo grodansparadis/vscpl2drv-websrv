@@ -96,6 +96,19 @@
 #include <sstream>
 #include <string>
 
+#include <json.hpp>  // Needs C++11  -std=c++11
+#include <mustache.hpp>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+// https://github.com/nlohmann/json
+using json = nlohmann::json;
+
+using namespace kainjow::mustache;
+
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -537,7 +550,7 @@ websrv_add_session(struct mg_connection* conn, void* cbdata)
 
     pSession->m_pClientItem = new CClientItem(); // Create client
     if (NULL == pSession->m_pClientItem) {
-        spdlog::get("logger")->critical("[websrv] New session: Unable to create client object.");
+        spdlog::get("logger")->critical(" New session: Unable to create client object.");
         delete pSession;
         return NULL;
     }
@@ -559,7 +572,7 @@ websrv_add_session(struct mg_connection* conn, void* cbdata)
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
         pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
-        spdlog::get("logger")->error("[websrv]  Failed to add client. Terminating thread.");
+        spdlog::get("logger")->error("  Failed to add client. Terminating thread.");
         return NULL;
     }
     pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
@@ -654,7 +667,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // Check pointers
     if (!conn || !(ctx = mg_get_context(conn)) ||
         !(reqinfo = mg_get_request_info(conn))) {
-        spdlog::get("logger")->error("[websrv] check_admin_authorization: Pointers are invalid.");
+        spdlog::get("logger")->error(" check_admin_authorization: Pointers are invalid.");
         return WEB_ERROR;
     }
 
@@ -665,7 +678,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // if (NULL ==
     //     (pUserItem = m_userList.getUser(pObj->m_admin_user.c_str()))) {
     //     spdlog::get("logger")->error(
-    //            "[websrv] check_admin_authorization: Admin user [%s] i not "
+    //            " check_admin_authorization: Admin user [%s] i not "
     //            "available.",
     //            m_admin_user.c_str());
     //     //mg_send_basic_access_authentication_request(conn, NULL);  // 1.13
@@ -675,7 +688,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if ((NULL == (auth_header = mg_get_header(conn, "Authorization"))) ||
         (vscp_strncasecmp(auth_header, "Basic ", 6) != 0)) {
-        spdlog::get("logger")->error("[websrv] check_admin_authorization: Authorization header or "
+        spdlog::get("logger")->error(" check_admin_authorization: Authorization header or "
                                         "digest missing for admin log in.");
         //mg_send_basic_access_authentication_request(conn, NULL); 1.13
         mg_send_digest_access_authentication_request(conn,NULL);
@@ -687,7 +700,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     const struct mg_request_info* pri = mg_get_request_info(conn);
     if (NULL == pri) {
-        spdlog::get("logger")->error("[websrv] check_admin_authorization: Failed to to get request info.");
+        spdlog::get("logger")->error(" check_admin_authorization: Failed to to get request info.");
         return WEB_ERROR;
     }
 
@@ -723,7 +736,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if (NULL == pUserItem) {
         // Password is not correct
-        spdlog::get("logger")->error("[websrv] Use on host [%s] NOT "
+        spdlog::get("logger")->error(" Use on host [%s] NOT "
                                         "allowed connect. User [%s]. Wrong user/password",
                                         (const char*)reqinfo->remote_addr,
                                         (const char*)pUserItem->getUserName().c_str());
@@ -739,7 +752,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
         // Host is not allowed to connect
-        spdlog::get("logger")->error("[websrv] Host [%s] "
+        spdlog::get("logger")->error(" Host [%s] "
                                         "NOT allowed to connect. User [%s]",
                                         (const char*)reqinfo->remote_addr,
                                         (const char*)pUserItem->getUserName().c_str());
@@ -774,7 +787,7 @@ check_rest_authorization(struct mg_connection* conn, void* cbdata)
 static int
 log_message(const struct mg_connection* conn, const char* message)
 {
-    spdlog::get("logger")->info("[websrv] %s", message);
+    spdlog::get("logger")->info(" %s", message);
     return WEB_OK;
 }
 
@@ -2842,21 +2855,21 @@ init_ssl(void* ssl_context, void* user_data)
 int
 start_webserver(void *cbdata)
 {
-    spdlog::get("logger")->debug("[websrv] Starting web server...");
+    spdlog::get("logger")->debug(" Starting web server...");
 
     if (NULL != cbdata) {
-        spdlog::get("logger")->error("[websrv] No user data supplied. The webserver need this. Aborting!");
+        spdlog::get("logger")->error(" No user data supplied. The webserver need this. Aborting!");
         return EXIT_FAILURE;
     }
 
     CWebObj *pObj = (CWebObj *)cbdata;  
 
     if (pObj->m_bEnableWebsockets) {
-        spdlog::get("logger")->debug("[websrv] Websockets enable...");
+        spdlog::get("logger")->debug(" Websockets enable...");
     }
 
     if (pObj->m_bEnableRestApi) {
-        spdlog::get("logger")->debug("[websrv] REST API enable...");
+        spdlog::get("logger")->debug(" REST API enable...");
     }
 
     // This structure must be larger than the number of options to set
@@ -3286,7 +3299,7 @@ start_webserver(void *cbdata)
 
     // Check return value:
     if (NULL == pObj->m_web_ctx) {
-        spdlog::get("logger")->error("[websrv]  Cannot start webserver - web_start failed.");
+        spdlog::get("logger")->error("  Cannot start webserver - web_start failed.");
         return EXIT_FAILURE;
     }
 

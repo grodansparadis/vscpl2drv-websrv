@@ -166,12 +166,16 @@ class CWebObj
     //                      Logging
     /////////////////////////////////////////////////////////
     
-    bool m_bEnableFileLog;                    // True to enable logging
-    spdlog::level::level_enum m_fileLogLevel; // log level
-    std::string m_fileLogPattern;             // log file pattern
-    std::string m_path_to_log_file;           // Path to logfile      
-    uint32_t m_max_log_size;                  // Max size for logfile before rotating occures 
-    uint16_t m_max_log_files;                 // Max log files to keep
+    bool m_bConsoleLogEnable;                     // True to enable logging
+    spdlog::level::level_enum m_consoleLogLevel;  // log level
+    std::string m_consoleLogPattern;              // log file pattern
+
+    bool m_bFileLogEnable;                        // True to enable logging
+    spdlog::level::level_enum m_fileLogLevel;     // log level
+    std::string m_fileLogPattern;                 // log file pattern
+    std::string m_path_to_log_file;               // Path to logfile      
+    uint32_t m_max_log_size;                      // Max size for logfile before rotating occures 
+    uint16_t m_max_log_files;                     // Max log files to keep
 
     // ------------------------------------------------------------------------
 
@@ -223,6 +227,7 @@ class CWebObj
     std::string m_web_ssl_cipher_list;
     uint8_t m_web_ssl_protocol_version;
     bool m_web_ssl_short_trust;
+    long m_web_ssl_cache_timeout;
     
     std::string m_web_cgi_interpreter;
     std::string m_web_cgi_patterns;
@@ -266,6 +271,9 @@ class CWebObj
     std::string m_web_lua_background_script;
     std::string m_web_lua_background_script_params;
 
+    std::string m_web_run_as_user;
+    bool m_web_case_sensitive;
+
     // Protects the web session object
     pthread_mutex_t m_mutex_websrvSession;
 
@@ -293,7 +301,6 @@ class CWebObj
     std::string m_websocket_document_root;
     long m_websocket_timeout_ms;
     bool bEnable_websocket_ping_pong;
-    std::string lua_websocket_pattern;
 
     // * * Websockets * *
 

@@ -191,6 +191,20 @@ else()
     add_definitions(-DOPENSSL_API_1_1)
 endif()
 
+# Civetweb defines
+#add_definitions(-DDEBUG_TRACE)
+add_definitions(-DUSE_IPV6)
+add_definitions(-DUSE_WEBSOCKET)
+add_definitions(-DLUA_COMPAT_ALL)
+add_definitions(-DUSE_LUA)
+add_definitions(-DUSE_LUA_SQLITE3)
+add_definitions(-DUSE_LUA_FILE_SYSTEM)
+add_definitions(-DUSE_DUKTAPE)
+add_definitions(-DUSE_SERVER_STATS)
+add_definitions(-DUSE_ZLIB)
+add_definitions(-DUSE_HTTP2)
+#add_definitions(-DUSE_X_DOM_SOCKET)
+
 set(RESOURCE_FILES
         README.md
         forms/index.html)

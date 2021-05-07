@@ -43,13 +43,13 @@
  * Init the webserver sub system
  */
 int
-start_webserver(void);
+start_webserver(void *cbdata);
 
 /*!
  * Init the webserver sub system
  */
 int
-stop_webserver(void);
+stop_webserver(void *cbdata);
 
 /*!
  * Send header
@@ -68,9 +68,13 @@ websrv_sendSetCookieHeader(struct mg_connection *conn,
                            const char *pcontent,
                            const char *psid);
 
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //                           ws1  Websocket handlers
 ////////////////////////////////////////////////////////////////////////////////
+
+
 
 int
 ws1_connectHandler(const struct mg_connection *conn, void *cbdata);

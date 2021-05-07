@@ -58,7 +58,7 @@ extern "C"
 #include <vscp.h>
 #include <vscp_debug.h>
 #include <vscpdatetime.h>
-#include <vscpdb.h>
+#include <webdefs.h>
 #include <vscphelper.h>
 #include <vscpremotetcpif.h>
 

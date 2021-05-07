@@ -50,7 +50,7 @@
 #include <userlist.h>
 #include <version.h>
 #include <vscp.h>
-#include <vscpdb.h>
+#include <webdefs.h>
 #include <vscphelper.h>
 #include <vscpremotetcpif.h>
 #include <clientlist.h>

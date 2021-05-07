@@ -46,6 +46,7 @@
 
 #include <expat.h>
 
+#include <webdefs.h>
 #include <hlo.h>
 #include <remotevariablecodes.h>
 #include <vscp.h>
@@ -73,7 +74,6 @@
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
-
 using namespace kainjow::mustache;
 
 // Forward declaration
@@ -101,6 +101,106 @@ CWebObj::CWebObj()
 
     pthread_mutex_init(&m_mutexSendQueue, NULL);
     pthread_mutex_init(&m_mutexReceiveQueue, NULL);
+
+    // Init pool
+    spdlog::init_thread_pool(8192, 1);
+
+    // Flush log every five seconds
+    spdlog::flush_every(std::chrono::seconds(5));
+
+    auto console = spdlog::stdout_color_mt("console");
+    // Start out with level=info. Config may change this
+    console->set_level(spdlog::level::debug);
+    console->set_pattern("[vscpl2drv-websrv] [%^%l%$] %v");
+    spdlog::set_default_logger(console);
+
+    console->debug("Starting the vscpl2drv-websrv...");
+
+    m_bConsoleLogEnable = true;                     
+    m_consoleLogLevel = spdlog::level::info;  
+    m_consoleLogPattern = "[vscp] [%^%l%$] %v";              
+
+    m_bFileLogEnable = true;
+    m_fileLogLevel = spdlog::level::info;
+    m_fileLogPattern = "[vscp] [%^%l%$] %v";
+    m_path_to_log_file = "/var/log/vscp/vscpl2drv-websrv.log";
+    m_max_log_size = 5242880;
+    m_max_log_files = 7;
+
+    // Set defaults (WEB)
+    m_bEnableWebServer = true;
+    m_web_document_root = "/var/lib/vscp/web/html";
+    m_web_listening_ports = "[::]:8888r, [::]:8843s, 8884";
+    m_web_index_files = "index.xhtml, index.html, index.htm ,index.lp, index.lsp, index.lua, index.cgi, index.shtml, index.php";
+    m_web_authentication_domain = "mydomain.com";
+    m_enable_auth_domain_check = false;
+    
+    m_access_log_file = "/var/log/vscp/vscpl2drv-websrv-access.log";
+    m_error_log_file = "/var/log/vscp/vscpl2drv-websrv-error.log";
+
+    m_web_ssl_certificate = "/srv/vscp/certs/tcpip_server.pem";
+    m_web_ssl_certificate_chain = "";
+    m_web_ssl_verify_peer = false;
+    m_web_ssl_ca_path = "";
+    m_web_ssl_ca_file = "";
+    m_web_ssl_verify_depth = 9;
+    m_web_ssl_default_verify_paths = true;
+    m_web_ssl_cipher_list = "DES-CBC3-SHA:AES128-SHA:AES128-GCM-SHA256";
+    m_web_ssl_protocol_version = 3;
+    m_web_ssl_short_trust = false;
+    m_web_ssl_cache_timeout = -1;
+    
+    std::string m_web_cgi_interpreter = "";
+    std::string m_web_cgi_patterns = "**.cgi$|**.pl$|**.php|**.py";
+    std::string m_web_cgi_environment = "";
+    
+    std::string m_web_protect_uri = "";
+    std::string m_web_throttle = "";
+    bool m_web_enable_directory_listing = true;
+    bool m_web_enable_keep_alive = false;
+    long m_web_keep_alive_timeout_ms = 0;
+    std::string m_web_access_control_list = "";
+    std::string m_web_extra_mime_types = "";
+    int m_web_num_threads = 50;
+    std::string m_web_url_rewrite_patterns = "";
+    std::string m_web_hide_file_patterns = "";
+    long m_web_request_timeout_ms = 10000;
+    long m_web_linger_timeout_ms = 0; 
+    bool m_web_decode_url = true;
+    std::string m_web_global_auth_file = "";
+    std::string m_web_per_directory_auth_file = "";
+    std::string m_web_ssi_patterns = "";
+    std::string m_web_access_control_allow_origin = "*";
+    std::string m_web_access_control_allow_methods = "*";
+    std::string m_web_access_control_allow_headers = "*";
+    std::string m_web_error_pages = "";
+    long m_web_tcp_nodelay = 0;
+    std::string m_web_static_file_cache_control = "";
+    long m_web_static_file_max_age = 3600;
+    long m_web_strict_transport_security_max_age = 0;
+    bool m_web_allow_sendfile_call = true;
+    std::string m_web_additional_header = "";
+    long m_web_max_request_size = 16384;
+    bool m_web_allow_index_script_resource = false;
+
+    std::string m_web_duktape_script_patterns = "**.ssjs$";  
+
+    std::string m_web_lua_preload_file = "";
+    std::string m_web_lua_script_patterns = "**.lua$";
+    std::string m_web_lua_server_page_patterns = "**.lp$|**.lsp$";
+    std::string m_web_lua_websocket_patterns = VSCPDB_CONFIG_DEFAULT_WEB_LUA_WEBSOCKET_PATTERN;
+    std::string m_web_lua_background_script = "";
+    std::string m_web_lua_background_script_params = "";
+
+    m_web_run_as_user = "";
+    m_web_case_sensitive = false;
+
+    m_bEnableWebsockets = true;
+    m_websocket_document_root = VSCPDB_CONFIG_DEFAULT_WEBSOCKET_DOCUMENT_ROOT;
+    m_websocket_timeout_ms = 10000;
+    bool bEnable_websocket_ping_pong = true;
+
+    m_bEnableRestApi = true;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -116,6 +216,10 @@ CWebObj::~CWebObj()
 
     pthread_mutex_destroy(&m_mutexSendQueue);
     pthread_mutex_destroy(&m_mutexReceiveQueue);
+
+    // Shutdown logger in a nice way
+    spdlog::drop_all(); 
+    spdlog::shutdown();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -154,15 +258,14 @@ CWebObj::open(std::string& path, const cguid& guid)
 
     // Read configuration file
     if (!doLoadConfig()) {
-        spdlog::get("logger")->critical(
-               "Failed to load configuration file [%s]",
-               path.c_str());
+        spdlog::get("logger")->critical("Failed to load configuration file [%s]",
+                                            path.c_str());
         return false;       
     }
 
     // Start the web server
     try {
-        start_webserver();
+        start_webserver(this);
     }
     catch (...) {
         spdlog::get("logger")->error( "Exception when starting web server");
@@ -171,14 +274,12 @@ CWebObj::open(std::string& path, const cguid& guid)
 
     // start the workerthread
     if (pthread_create(&m_pthreadSend, NULL, workerThreadSend, this)) {
-        spdlog::get("logger")->error(
-               "Unable to start send worker thread.");
+        spdlog::get("logger")->error("Unable to start send worker thread.");
         return false;
     }
 
     if (pthread_create(&m_pthreadReceive, NULL, workerThreadReceive, this)) {
-        spdlog::get("logger")->error(
-               "Unable to start receive worker thread.");
+        spdlog::get("logger")->error("Unable to start receive worker thread.");
         return false;
     }
 
@@ -215,9 +316,8 @@ CWebObj::readEncryptionKey(const std::string& path)
         return vscp_hexStr2ByteArray(m_vscp_key, 32, strStream.str().c_str());
     }
     catch (...) {  
-        spdlog::get("logger")->error(
-                "Failed to read encryption key file [%s]",
-                m_path.c_str());             
+        spdlog::get("logger")->error("Failed to read encryption key file [%s]",
+                                        m_path.c_str());             
         return false;
     }
 
@@ -246,37 +346,105 @@ CWebObj::doLoadConfig(void)
 
     spdlog::debug("Reading configuration from [{}]", m_path);
 
-    // write
-    if (m_j_config.contains("write")) {
-        try {
-            m_bWriteEnable = m_j_config["write"].get<bool>();
-        }
-        catch (const std::exception& ex) {
-            spdlog::error("Failed to read 'write' Error='{}'", ex.what());    
-        }
-        catch(...) {
-            spdlog::error("Failed to read 'write' due to unknown error.");
-        }
-    }
-    else  {
-        spdlog::error("Failed to read 'write' item from configuration file. Defaults will be used.");
-    }
-
-    // VSCP key file
-    if (m_j_config.contains("key-file")&& m_j_config["key-file"].is_string()) {
-        if (!readEncryptionKey(m_j_config["key-file"].get<std::string>())) {       
-            spdlog::warn("Failed to read VSCP key from file [{}]. Default key will be used. Dangerous!",
-                            m_j_config["key-file"].get<std::string>());
-        }
-    }
-    else {
-        spdlog::warn("VSCP key file is not defined. Default key will be used. Dangerous!");
-    }
-
     // Logging
     if (m_j_config.contains("logging") && m_j_config["logging"].is_object()) {
 
         json j = m_j_config["logging"];
+
+        // * * *  CONSOLE  * * * 
+
+        // Logging: console-log-enable
+        if (j.contains("console-enable")) {
+            try {
+                m_bConsoleLogEnable = j["console-enable"].get<bool>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error("Failed to read 'console-enable' Error='{}'", ex.what());    
+            }
+            catch(...) {
+                spdlog::error("Failed to read 'console-enable' due to unknown error.");
+            }
+        }
+        else  {
+            spdlog::debug("Failed to read LOGGING 'console-enable' Defaults will be used.");
+        }
+
+        // Logging: console-log-level
+        if (j.contains("console-level")) {
+            std::string str;
+            try {
+                str = j["console-level"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error("Failed to read 'console-level' Error='{}'", ex.what());    
+            }
+            catch(...) {
+                spdlog::error("Failed to read 'console-level' due to unknown error.");
+            }
+            vscp_makeLower(str);
+            if (std::string::npos != str.find("off")) {
+                m_consoleLogLevel = spdlog::level::off;
+            }
+            else if (std::string::npos != str.find("critical")) {
+                m_consoleLogLevel = spdlog::level::critical;
+            }
+            else if (std::string::npos != str.find("err")) {
+                m_consoleLogLevel = spdlog::level::err;
+            }
+            else if (std::string::npos != str.find("warn")) {
+                m_consoleLogLevel = spdlog::level::warn;
+            }
+            else if (std::string::npos != str.find("info")) {
+                m_consoleLogLevel = spdlog::level::info;
+            }
+            else if (std::string::npos != str.find("debug")) {
+                m_consoleLogLevel = spdlog::level::debug;
+            }
+            else if (std::string::npos != str.find("trace")) {
+                m_consoleLogLevel = spdlog::level::trace;
+            }
+            else {
+                spdlog::error("Failed to read LOGGING 'console-level' has invalid value [{}]. Default value used.",
+                                str);
+            }            
+        } 
+        else  {
+            spdlog::error("Failed to read LOGGING 'console-level' Defaults will be used.");                                        
+        }
+
+        // Logging: console-log-pattern
+        if (j.contains("console-pattern")) {
+            try {
+                m_consoleLogPattern = j["console-pattern"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error("Failed to read 'console-pattern' Error='{}'", ex.what());    
+            }
+            catch(...) {
+                spdlog::error("Failed to read 'console-pattern' due to unknown error.");
+            }
+        }
+        else  {
+            spdlog::debug("Failed to read LOGGING 'console-pattern' Defaults will be used.");
+        }
+
+        // * * *  FILE  * * * 
+
+        // Logging: file-log-enable
+        if (j.contains("file-enable")) {
+            try {
+                m_bFileLogEnable = j["file-enable"].get<bool>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error("Failed to read 'file-enable' Error='{}'", ex.what());    
+            }
+            catch(...) {
+                spdlog::error("Failed to read 'file-enable' due to unknown error.");
+            }
+        }
+        else  {
+            spdlog::debug("Failed to read LOGGING 'file-enable' Defaults will be used.");
+        }
 
         // Logging: file-log-level
         if (j.contains("file-level")) {
@@ -390,6 +558,80 @@ CWebObj::doLoadConfig(void)
        spdlog::error("No logging has been setup."); 
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    //                          Setup logger
+    ///////////////////////////////////////////////////////////////////////////
+
+    // Console log
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt >();
+    if (m_bConsoleLogEnable) {
+        console_sink->set_level(m_consoleLogLevel);
+        console_sink->set_pattern(m_consoleLogPattern);            
+    }
+    else {
+        // If disabled set to off
+        console_sink->set_level(spdlog::level::off);
+    }
+
+    //auto rotating = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log_filename", 1024*1024, 5, false);
+    auto rotating_file_sink = 
+            std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+                                                    m_path_to_log_file.c_str(), 
+                                                    m_max_log_size, 
+                                                    m_max_log_files);
+
+    if (m_bFileLogEnable) {
+        rotating_file_sink->set_level(m_fileLogLevel);
+        rotating_file_sink->set_pattern(m_fileLogPattern);            
+    }
+    else {
+        // If disabled set to off
+        rotating_file_sink->set_level(spdlog::level::off);
+    }    
+
+    std::vector<spdlog::sink_ptr> sinks {console_sink, rotating_file_sink};
+    auto logger = std::make_shared<spdlog::async_logger>("logger", 
+                                                            sinks.begin(), 
+                                                            sinks.end(), 
+                                                            spdlog::thread_pool(), 
+                                                            spdlog::async_overflow_policy::block);
+    // The separate sub loggers will handle trace levels
+    logger->set_level(spdlog::level::trace);                                                            
+    spdlog::register_logger(logger);
+
+    // ------------------------------------------------------------------------
+
+    // write
+    if (m_j_config.contains("write")) {
+        try {
+            m_bWriteEnable = m_j_config["write"].get<bool>();
+            spdlog::debug("bWriteEnable set to {}", m_bWriteEnable);
+        }
+        catch (const std::exception& ex) {
+            spdlog::error("Failed to read 'write' Error='{}'", ex.what());    
+        }
+        catch(...) {
+            spdlog::error("Failed to read 'write' due to unknown error.");
+        }
+    }
+    else  {
+        spdlog::error("Failed to read 'write' item from configuration file. Defaults will be used.");
+    }
+
+    // VSCP key file
+    if (m_j_config.contains("key-file")&& m_j_config["key-file"].is_string()) {
+        if (!readEncryptionKey(m_j_config["key-file"].get<std::string>())) {       
+            spdlog::warn("Failed to read VSCP key from file [{}]. Default key will be used. Dangerous!",
+                            m_j_config["key-file"].get<std::string>());
+        }
+        else {
+            spdlog::debug("key-file {} read successfully", m_j_config["key-file"].get<std::string>());
+        }
+    }
+    else {
+        spdlog::warn("VSCP key file is not defined. Default key will be used. Dangerous!");
+    }    
+
     // Path to user database  
     if (m_j_config.contains("path-users")) {
         try {
@@ -487,6 +729,8 @@ CWebObj::doLoadConfig(void)
     //*************************************************************************
     //                             WEB-Server
     //*************************************************************************
+
+    // https://github.com/civetweb/civetweb/blob/master/docs/UserManual.md
 
     if (m_j_config.contains("web") && m_j_config["web"].is_object()) {
         
@@ -1066,6 +1310,31 @@ CWebObj::doLoadConfig(void)
             m_web_allow_index_script_resource = j["allow-index-script-resource"].get<bool>();
         }
 
+        // run_as_user : ""
+        // Switch to given user credentials after startup. Usually, this option is required when CivetWeb needs 
+        // to bind on privileged ports on UNIX. To do that, CivetWeb needs to be started as root. From a security 
+        // point of view, running as root is not advisable, therefore this option can be used to drop privileges. 
+        // Example:
+        //
+        // civetweb -listening_ports 80 -run_as_user webserver
+
+        if (j.contains("run_as_user") && j["run_as_user"].is_string()) {
+            m_web_run_as_user = j["run_as_user"].get<std::string>();
+        }
+
+        // case_sensitive : false
+        // This option can be uset to enable case URLs for Windows servers. It is only available for Windows systems. 
+        // Windows file systems are not case sensitive, but they still store the file name including case. If this option 
+        // is set to yes, the comparison for URIs and Windows file names will be case sensitive.
+
+        if (j.contains("case_sensitive") && j["run_as_user"].is_boolean()) {
+            m_web_case_sensitive = j["case_sensitive"].get<bool>();
+        }
+
+        ///////////////////////////////////////////////////////////////////////
+        //                                TLS
+        ///////////////////////////////////////////////////////////////////////
+
         // TLS / SSL
         if (j.contains("tls") && j["tls"].is_object()) {
 
@@ -1282,6 +1551,27 @@ CWebObj::doLoadConfig(void)
             else  {
                 spdlog::debug(" Failed to read 'short-trust' Defaults will be used.");
             } 
+
+            // Allow caching of SSL/TLS sessions, so HTTPS connection from the same client to the same server 
+            // can be established faster. A configuration value >0 activates session caching. The configuration 
+            // value is the maximum lifetime of a cached session in seconds. The default is to deactivated 
+            // session caching.
+
+            // ssl_cache_timeout: -1
+            if (jj.contains("cache-timeout")) {
+                try {
+                    m_web_ssl_cache_timeout = jj["cache-timeout"].get<long>();
+                }
+                catch (const std::exception& ex) {
+                    spdlog::error("Failed to read 'cache-timeout' Error='{}'", ex.what());    
+                }
+                catch(...) {
+                    spdlog::error("Failed to read 'cache-timeout' due to unknown error.");
+                }
+            }
+            else  {
+                spdlog::debug(" Failed to read 'cache-timeout' Defaults will be used.");
+            }
 
         }  // TLS
 

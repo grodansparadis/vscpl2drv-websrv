@@ -41,7 +41,7 @@
 #include <userlist.h>
 #include <version.h>
 #include <vscp.h>
-#include <vscpdb.h>
+#include <webdefs.h>
 #include <vscphelper.h>
 #include <webobj.h>
 //#include <vscpremotetcpif.h>

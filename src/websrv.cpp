@@ -71,6 +71,7 @@
 
 #include <civetweb.h>
 
+
 #include "webobj.h"
 #include "restsrv.h"
 #include <actioncodes.h>
@@ -84,10 +85,9 @@
 #include <vscp_aes.h>
 #include <vscpbase64.h>
 #include <vscpdatetime.h>
-#include <vscpdb.h>
+#include <webdefs.h>
 #include <vscphelper.h>
 #include <vscpmd5.h>
-//#include <websocket.h>
 
 #include "websrv.h"
 
@@ -106,7 +106,6 @@
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
-
 using namespace kainjow::mustache;
 
 #ifndef _CRT_SECURE_NO_WARNINGS
@@ -136,14 +135,6 @@ const char* pguid_types[] = { "Common GUID",
                               NULL };
 
 ///////////////////////////////////////////////////
-//                 GLOBALS
-///////////////////////////////////////////////////
-
-// extern CControlObject* gpobj;
-// extern bool gbRestart;          // Should be set true to restart the VSCP daemon
-// extern int gbStopDaemon;        // Should be set true to stop the daemon
-
-///////////////////////////////////////////////////
 //                WEBSERVER
 ///////////////////////////////////////////////////
 
@@ -153,16 +144,15 @@ const char* pguid_types[] = { "Common GUID",
 
 void
 websrv_sendheader(struct mg_connection* conn,
-                  int returncode,
-                  const char* pcontent)
+                    int returncode,
+                    const char* pcontent)
 {
     char date[64];
     time_t curtime = time(NULL);
     vscp_getTimeString(date, sizeof(date), &curtime);
 
     // Check pointers
-    if (NULL == pcontent)
-        return;
+    if (NULL == pcontent) return;
 
     mg_printf(conn,
               "HTTP/1.1 %d OK\r\n"
@@ -1906,7 +1896,7 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Websocket lua pattern:</b>");
     mg_printf(conn,
               "%s",
-              (const char*)std::string(pObj->lua_websocket_pattern).c_str());
+              (const char*)std::string(pObj->m_web_lua_websocket_patterns).c_str());
     mg_printf(conn, "<br>");
 
     mg_printf(conn, "<hr>");
@@ -2857,7 +2847,7 @@ start_webserver(void *cbdata)
 {
     spdlog::get("logger")->debug(" Starting web server...");
 
-    if (NULL != cbdata) {
+    if (nullptr == cbdata) {
         spdlog::get("logger")->error(" No user data supplied. The webserver need this. Aborting!");
         return EXIT_FAILURE;
     }
@@ -2902,7 +2892,12 @@ start_webserver(void *cbdata)
     if (!pObj->m_enable_auth_domain_check) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_AUTH_DOMAIN_CHECK + 4);
-        web_options[pos++] = vscp_strdup("no");
+        if (pObj->m_enable_auth_domain_check) {
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else { 
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     web_options[pos++] =
@@ -2919,7 +2914,12 @@ start_webserver(void *cbdata)
     if (pObj->m_web_ssl_verify_peer) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_PEER + 4);
-        web_options[pos++] = vscp_strdup("yes");
+        if (pObj->m_web_ssl_verify_peer) {  
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_ssl_ca_path.length()) {
@@ -2948,7 +2948,12 @@ start_webserver(void *cbdata)
     if (!pObj->m_web_ssl_default_verify_paths) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_DEFAULT_VERIFY_PATHS + 4);
-        web_options[pos++] = vscp_strdup("no");
+        if (pObj->m_web_ssl_default_verify_paths) {
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {  
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     web_options[pos++] =
@@ -2968,7 +2973,12 @@ start_webserver(void *cbdata)
     if (!pObj->m_web_ssl_short_trust) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_SHORT_TRUST + 4);
-        web_options[pos++] = vscp_strdup("yes");
+        if (pObj->m_web_ssl_short_trust) {  
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {
+             web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_cgi_interpreter.length()) {
@@ -3008,13 +3018,23 @@ start_webserver(void *cbdata)
     if (!pObj->m_web_enable_directory_listing) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_DIRECTORY_LISTING + 4);
-        web_options[pos++] = vscp_strdup("no");
+        if (pObj->m_web_enable_directory_listing) {
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {          
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_enable_keep_alive) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_KEEP_ALIVE + 4);
-        web_options[pos++] = vscp_strdup("yes");
+        if (pObj->m_web_enable_keep_alive) {  
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_keep_alive_timeout_ms !=
@@ -3082,7 +3102,12 @@ start_webserver(void *cbdata)
 
     if (!pObj->m_web_decode_url) {
         web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DECODE_URL + 4);
-        web_options[pos++] = vscp_strdup("no");
+        if (pObj->m_web_decode_url) {
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_global_auth_file.length()) {
@@ -3170,7 +3195,12 @@ start_webserver(void *cbdata)
     if (!pObj->m_web_allow_sendfile_call) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ALLOW_SENDFILE_CALL + 4);
-        web_options[pos++] = vscp_strdup("no");
+        if (pObj->m_web_allow_sendfile_call) {
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {  
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_additional_header.length()) {
@@ -3192,7 +3222,12 @@ start_webserver(void *cbdata)
     if (pObj->m_web_allow_index_script_resource) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ALLOW_INDEX_SCRIPT_RESOURCE + 4);
-        web_options[pos++] = vscp_strdup("yes");
+        if (pObj->m_web_allow_index_script_resource) {  
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
 
     if (pObj->m_web_duktape_script_patterns.length()) {
@@ -3263,15 +3298,13 @@ start_webserver(void *cbdata)
     if (pObj->bEnable_websocket_ping_pong) {
         web_options[pos++] =
           vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_PING_PONG_ENABLE + 4);
-        web_options[pos++] = vscp_strdup("yes");
+        if (pObj->bEnable_websocket_ping_pong) {  
+            web_options[pos++] = vscp_strdup("yes");
+        }
+        else {
+            web_options[pos++] = vscp_strdup("no");
+        }
     }
-
-    // if (lua_websocket_pattern.length()) {   // !!! Duplicate  ????
-    //     web_options[pos++] =
-    //       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_WEBSOCKET_PATTERN + 4);
-    //     web_options[pos++] =
-    //       vscp_strdup((const char*)pObj->lua_websocket_pattern.c_str());
-    // }
 
     // Mark end
     web_options[pos++] = NULL;

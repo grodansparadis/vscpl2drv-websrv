@@ -51,7 +51,6 @@
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
-
 using namespace kainjow::mustache;
 
 void

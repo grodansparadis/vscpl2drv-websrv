@@ -42,7 +42,7 @@
 #include <version.h>
 #include <vscp.h>
 #include <vscp_debug.h>
-#include <vscpdb.h>
+#include <webdefs.h>
 #include <vscphelper.h>
 #include <vscpremotetcpif.h>
 

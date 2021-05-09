@@ -204,7 +204,7 @@ add_definitions(-DUSE_SERVER_STATS)
 add_definitions(-DUSE_ZLIB)
 add_definitions(-DUSE_HTTP2)
 add_definitions(-DUSE_4_CGI)
-add_definitions(-DUSE_TIMERS)
+#add_definitions(-DUSE_TIMERS)
 #add_definitions(-DUSE_X_DOM_SOCKET)
 
 set(RESOURCE_FILES

@@ -203,6 +203,8 @@ add_definitions(-DUSE_DUKTAPE)
 add_definitions(-DUSE_SERVER_STATS)
 add_definitions(-DUSE_ZLIB)
 add_definitions(-DUSE_HTTP2)
+add_definitions(-DUSE_4_CGI)
+add_definitions(-DUSE_TIMERS)
 #add_definitions(-DUSE_X_DOM_SOCKET)
 
 set(RESOURCE_FILES
@@ -323,6 +325,7 @@ else()
     target_link_libraries(vscpl2drv-websrv PRIVATE     
         m
         dl
+        z
         Threads::Threads
         OpenSSL::SSL 
         OpenSSL::Crypto

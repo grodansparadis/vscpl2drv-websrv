@@ -181,8 +181,7 @@ websrv_sendSetCookieHeader(struct mg_connection* conn,
     vscp_getTimeString(date, sizeof(date), &curtime);
 
     // Check pointers
-    if ((NULL == pcontent) || (NULL == psid))
-        return;
+    if ((NULL == pcontent) || (NULL == psid)) return;
 
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
@@ -308,7 +307,8 @@ skip_quoted(char** buf,
                 memmove(p, end_word, end_off + 1);
                 p += end_off; /* p must correspond to end_word - 1 */
                 end_word += end_off + 1;
-            } else {
+            } 
+            else {
                 *p = '\0';
                 break;
             }
@@ -668,7 +668,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // if (NULL ==
     //     (pUserItem = m_userList.getUser(pObj->m_admin_user.c_str()))) {
     //     spdlog::get("logger")->error(
-    //            " check_admin_authorization: Admin user [%s] i not "
+    //            " check_admin_authorization: Admin user [{}] i not "
     //            "available.",
     //            m_admin_user.c_str());
     //     //mg_send_basic_access_authentication_request(conn, NULL);  // 1.13
@@ -726,8 +726,8 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if (NULL == pUserItem) {
         // Password is not correct
-        spdlog::get("logger")->error(" Use on host [%s] NOT "
-                                        "allowed connect. User [%s]. Wrong user/password",
+        spdlog::get("logger")->error(" Use on host [{}] NOT "
+                                        "allowed connect. User [{}]. Wrong user/password",
                                         (const char*)reqinfo->remote_addr,
                                         (const char*)pUserItem->getUserName().c_str());
         //mg_send_basic_access_authentication_request(conn, NULL); 1.13
@@ -742,8 +742,8 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
         // Host is not allowed to connect
-        spdlog::get("logger")->error(" Host [%s] "
-                                        "NOT allowed to connect. User [%s]",
+        spdlog::get("logger")->error(" Host [{}] "
+                                        "NOT allowed to connect. User [{}]",
                                         (const char*)reqinfo->remote_addr,
                                         (const char*)pUserItem->getUserName().c_str());
         // mg_send_basic_access_authentication_request(conn, NULL); 1.13
@@ -777,7 +777,7 @@ check_rest_authorization(struct mg_connection* conn, void* cbdata)
 static int
 log_message(const struct mg_connection* conn, const char* message)
 {
-    spdlog::get("logger")->info(" %s", message);
+    spdlog::get("logger")->info(" {}", message);
     return WEB_OK;
 }
 

@@ -29,51 +29,50 @@
 #if !defined(VSCP_JAVASCRIPT__INCLUDED_)
 #define VSCP_JAVASCRIPT__INCLUDED_
 
-#include <vscpdatetime.h>
 #include <clientlist.h>
+#include <vscpdatetime.h>
 #include <webobj.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // actionJavascriptObj
 //
 
-class actionJavascriptObj
-{
+class actionJavascriptObj {
 
-  public:
-    /// Constructor
-    actionJavascriptObj(std::string &strScript);
+public:
+  /// Constructor
+  actionJavascriptObj(std::string& strScript);
 
-    /// Destructor
-    virtual ~actionJavascriptObj();
+  /// Destructor
+  virtual ~actionJavascriptObj();
 
-    /*!
-        Termination control
-     */
-    bool m_bQuit;
+  /*!
+      Termination control
+   */
+  bool m_bQuit;
 
-    /*!
-     * Script
-     */
-    std::string m_strScript;
+  /*!
+   * Script
+   */
+  std::string m_strScript;
 
-    /// JavaScript executing id
-    uint64_t m_id;
+  /// JavaScript executing id
+  uint64_t m_id;
 
-    /// Time when script was started
-    vscpdatetime m_start;
+  /// Time when script was started
+  vscpdatetime m_start;
 
-    /// Time when script was stopped
-    vscpdatetime m_stop;
+  /// Time when script was stopped
+  vscpdatetime m_stop;
 
-    /// Client item for script
-    CClientItem *m_pClientItem;
+  /// Client item for script
+  CClientItem* m_pClientItem;
 
-    /// Pointer to owner
-    CWebObj *pParent;
+  /// Pointer to owner
+  CWebObj* pParent;
 
-    /// Feed event
-    vscpEventEx m_feedEvent;
+  /// Feed event
+  vscpEventEx m_feedEvent;
 };
 
 #endif

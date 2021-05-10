@@ -29,9 +29,9 @@
 #if !defined(WEBSOCKET_H__INCLUDED_)
 #define WEBSOCKET_H__INCLUDED_
 
-#include <vscp.h>
-#include <clientlist.h>
 #include "webobj.h"
+#include <clientlist.h>
+#include <vscp.h>
 
 //******************************************************************************
 //                                WEBSOCKETS
@@ -48,26 +48,24 @@
 #define WEBSOCKET_EXPIRE_TIME (2 * 60)
 
 // Authentication states
-enum
-{
-    WEBSOCK_CONN_STATE_NULL = 0,
-    WEBSOCK_CONN_STATE_CONNECTED,
-    WEBSOCK_CONN_STATE_DATA
+enum {
+  WEBSOCK_CONN_STATE_NULL = 0,
+  WEBSOCK_CONN_STATE_CONNECTED,
+  WEBSOCK_CONN_STATE_DATA
 };
 
-enum
-{
-    WEBSOCK_ERROR_NO_ERROR          = 0,            // Everything is OK.
-    WEBSOCK_ERROR_SYNTAX_ERROR      = 1,            // Syntax error.
-    WEBSOCK_ERROR_UNKNOWN_COMMAND   = 2,            // Unknown command.
-    WEBSOCK_ERROR_TX_BUFFER_FULL    = 3,            // Transmit buffer full.
-    WEBSOCK_ERROR_MEMORY_ALLOCATION = 4,            // Problem allocating memory.
-    WEBSOCK_ERROR_NOT_AUTHORISED    = 5,            // Not authorised-
-    WEBSOCK_ERROR_NOT_ALLOWED_TO_SEND_EVENT = 6,    // Not authorized to send events.
-    WEBSOCK_ERROR_NOT_ALLOWED_TO_DO_THAT = 7,       // Not allowed to do that.
-    WEBSOCK_ERROR_PARSE_FORMAT            = 8,      // Parse error, invalid format.
-    WEBSOCK_ERROR_UNKNOWN_TYPE = 9,                 // Unkown object type
-    WEBSOCK_ERROR_GENERAL = 10,                     // General errors and exceptions
+enum {
+  WEBSOCK_ERROR_NO_ERROR                  = 0, // Everything is OK.
+  WEBSOCK_ERROR_SYNTAX_ERROR              = 1, // Syntax error.
+  WEBSOCK_ERROR_UNKNOWN_COMMAND           = 2, // Unknown command.
+  WEBSOCK_ERROR_TX_BUFFER_FULL            = 3, // Transmit buffer full.
+  WEBSOCK_ERROR_MEMORY_ALLOCATION         = 4, // Problem allocating memory.
+  WEBSOCK_ERROR_NOT_AUTHORIZED            = 5, // Not authorized-
+  WEBSOCK_ERROR_NOT_ALLOWED_TO_SEND_EVENT = 6, // Not authorized to send events.
+  WEBSOCK_ERROR_NOT_ALLOWED_TO_DO_THAT    = 7, // Not allowed to do that.
+  WEBSOCK_ERROR_PARSE_FORMAT              = 8, // Parse error, invalid format.
+  WEBSOCK_ERROR_UNKNOWN_TYPE              = 9, // Unkown object type
+  WEBSOCK_ERROR_GENERAL                   = 10, // General errors and exceptions
 };
 
 #define WEBSOCK_STR_ERROR_NO_ERROR        "Everything is OK."
@@ -75,13 +73,14 @@ enum
 #define WEBSOCK_STR_ERROR_UNKNOWN_COMMAND "Unknown command."
 #define WEBSOCK_STR_ERROR_TX_BUFFER_FULL  "Transmit buffer full."
 #define WEBSOCK_STR_ERROR_MEMORY_ALLOCATION                                    \
-    "Having problems to allocate memory."
-#define WEBSOCK_STR_ERROR_NOT_AUTHORISED            "Not authorised."
+  "Having problems to allocate memory."
+#define WEBSOCK_STR_ERROR_NOT_AUTHORIZED            "Not authorized."
 #define WEBSOCK_STR_ERROR_NOT_ALLOWED_TO_SEND_EVENT "Not allowed to send event."
 #define WEBSOCK_STR_ERROR_NOT_ALLOWED_TO_DO_THAT                               \
-    "Not allowed to do that (check privileges)"
+  "Not allowed to do that (check privileges)"
 #define WEBSOCK_STR_ERROR_PARSE_FORMAT "Parse error, invalid format."
-#define WEBSOCK_STR_ERROR_UNKNOWN_TYPE "Unknown type, only know 'COMMAND' and 'EVENT'."
+#define WEBSOCK_STR_ERROR_UNKNOWN_TYPE                                         \
+  "Unknown type, only know 'COMMAND' and 'EVENT'."
 #define WEBSOCK_STR_ERROR_GENERAL "Exception or other general error."
 
 #define WEBSOCKET_MAINCODE_POSITIVE "+"
@@ -106,79 +105,78 @@ class CWebObj;
     websocket session
 */
 
-class websock_session
-{
+class websock_session {
 
-  public:
-    websock_session(void);
-    ~websock_session(void);
+public:
+  websock_session(void);
+  ~websock_session(void);
 
-    // ws type 1/2
-    uint8_t m_wstypes;
+  // ws type 1/2
+  uint8_t m_wstypes;
 
-    // Connection object
-    struct mg_connection* m_conn;
+  // Connection object
+  struct mg_connection* m_conn;
 
-    // Connection state (see enums above)
-    int m_conn_state;
+  // Connection state (see enums above)
+  int m_conn_state;
 
-    // Unique ID for this session.
-    char m_websocket_key[33]; // Sec-WebSocket-Key
+  // Unique ID for this session.
+  char m_websocket_key[33]; // Sec-WebSocket-Key
 
-    // 16 byte iv (SID) for this session
-    char m_sid[33];
+  // 16 byte iv (SID) for this session
+  char m_sid[33];
 
-    // Protocol version
-    int m_version; // Sec-WebSocket-Version
+  // Protocol version
+  int m_version; // Sec-WebSocket-Version
 
-    // Time when this session was last active.
-    time_t lastActiveTime;
+  // Time when this session was last active.
+  time_t lastActiveTime;
 
-    // Concatenated message receive
-    std::string m_strConcatenated;
+  // Concatenated message receive
+  std::string m_strConcatenated;
 
-    // Client structure for websocket 
-    CClientItem* m_pClientItem;
+  // Client structure for websocket
+  CClientItem* m_pClientItem;
 
-    // Owner of this session
-    CWebObj *m_pParent;
+  // Owner of this session
+  CWebObj* m_pParent;
 };
 
 #define WS2_COMMAND                                                            \
-    "{"                                                                        \
-    " \"type\" : \"CMD\", "                                                    \
-    " \"command\" : \"%s\", "                                                  \
-    " \"args\" : %s"                                                           \
-    "}"
+  "{"                                                                          \
+  " \"type\" : \"CMD\", "                                                      \
+  " \"command\" : \"%s\", "                                                    \
+  " \"args\" : %s"                                                             \
+  "}"
 
 #define WS2_EVENT                                                              \
-    "{"                                                                        \
-    " \"type\" : \"EVENT\", "                                                  \
-    " \"event\" : "                                                            \
-    " %s "                                                                     \
-    "}"
+  "{"                                                                          \
+  " \"type\" : \"EVENT\", "                                                    \
+  " \"event\" : "                                                              \
+  " %s "                                                                       \
+  "}"
 
 #define WS2_POSITIVE_RESPONSE                                                  \
-    "{"                                                                        \
-    " \"type\" : \"+\", "                                                      \
-    " \"command\" : \"%s\", "                                                  \
-    " \"args\" : %s"                                                           \
-    "}"
+  "{"                                                                          \
+  " \"type\" : \"+\", "                                                        \
+  " \"command\" : \"%s\", "                                                    \
+  " \"args\" : %s"                                                             \
+  "}"
 
 #define WS2_NEGATIVE_RESPONSE                                                  \
-    "{"                                                                        \
-    " \"type\" : \"-\", "                                                      \
-    " \"command\" : \"%s\", "                                                  \
-    " \"errcode\" : %d, "                                                   \
-    " \"errstr\" : \"%s\" "                                                 \
-    "}"
+  "{"                                                                          \
+  " \"type\" : \"-\", "                                                        \
+  " \"command\" : \"%s\", "                                                    \
+  " \"errcode\" : %d, "                                                        \
+  " \"errstr\" : \"%s\" "                                                      \
+  "}"
 
 #define WS2_VARIABLE                                                           \
-    "{"                                                                        \
-    " \"type\" : \"VARIABLE\", "                                               \
-    " \"variable\" : "                                                         \
-    " %s "                                                                     \
-    "}"
+  "{"                                                                          \
+  " \"type\" : \"VARIABLE\", "                                                 \
+  " \"variable\" : "                                                           \
+  " %s "                                                                       \
+  "}"
 
 const int MSG_TYPE_COMMAND           = 0; // Built in command
 const int MSG_TYPE_XCOMMAND          = 1; // Add on command
@@ -191,26 +189,25 @@ const int MSG_TYPE_VARIABLE          = 5; // Changed variable
     w2msg - Web socket message
 */
 
-class w2msg
-{
-  public:
-    w2msg(void);
-    ~w2msg(void);
+class w2msg {
+public:
+  w2msg(void);
+  ~w2msg(void);
 
-    /*
-        Event (E)/Command (C)/Response (+)/Variable (V)
-    */
-    int m_type;
+  /*
+      Event (E)/Command (C)/Response (+)/Variable (V)
+  */
+  int m_type;
 
-    /*
-        Command/Response/Variable arguments
-    */
-    std::map<std::string, std::string> m_arguments;
+  /*
+      Command/Response/Variable arguments
+  */
+  std::map<std::string, std::string> m_arguments;
 
-    /*
-        Holder for Event
-    */
-    vscpEventEx m_ex;
+  /*
+      Holder for Event
+  */
+  vscpEventEx m_ex;
 };
 
 // Public functions

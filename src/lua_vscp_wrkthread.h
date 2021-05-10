@@ -35,40 +35,39 @@
 // actionLuaObj
 //
 
-class actionLuaObj
-{
+class actionLuaObj {
 
-  public:
-    /// Constructor
-    actionLuaObj(std::string &strScript);
+public:
+  /// Constructor
+  actionLuaObj(std::string& strScript);
 
-    /// Destructor
-    virtual ~actionLuaObj();
+  /// Destructor
+  virtual ~actionLuaObj();
 
-    /*!
-        Termination control
-     */
-    bool m_bQuit;
+  /*!
+      Termination control
+   */
+  bool m_bQuit;
 
-    /*!
-     * Script
-     */
-    std::string m_strScript;
+  /*!
+   * Script
+   */
+  std::string m_strScript;
 
-    /// Lua executing id
-    uint64_t m_id;
+  /// Lua executing id
+  uint64_t m_id;
 
-    /// Time when script was started
-    vscpdatetime m_start;
+  /// Time when script was started
+  vscpdatetime m_start;
 
-    /// Time when script was stopped
-    vscpdatetime m_stop;
+  /// Time when script was stopped
+  vscpdatetime m_stop;
 
-    /// Client item for script
-    //CClientItem *m_pClientItem;
+  /// Client item for script
+  // CClientItem *m_pClientItem;
 
-    /// Feed event
-    vscpEventEx m_feedEvent;
+  /// Feed event
+  vscpEventEx m_feedEvent;
 };
 
 #endif

@@ -29,124 +29,124 @@
 #if !defined(VSCP_WEBSRV_H__INCLUDED_)
 #define VSCP_WEBSRV_H__INCLUDED_
 
-#include <userlist.h>
 #include <clientlist.h>
+#include <userlist.h>
 //#include <websocket.h>
 
 #include <map>
 #include <string>
 
-#define WEB_ERROR   0   // Page was not served
-#define WEB_OK      1   // Page served 1-999
+#define WEB_ERROR 0 // Page was not served
+#define WEB_OK    1 // Page served 1-999
 
 /*!
  * Init the webserver sub system
  */
 int
-start_webserver(void *cbdata);
+start_webserver(void* cbdata);
 
 /*!
  * Init the webserver sub system
  */
 int
-stop_webserver(void *cbdata);
+stop_webserver(void* cbdata);
 
 /*!
  * Send header
  */
 void
-websrv_sendheader(struct mg_connection *conn,
+websrv_sendheader(struct mg_connection* conn,
                   int returncode,
-                  const char *pcontent);
+                  const char* pcontent);
 
 /*!
  * Send header set 'sessionid' cookie
  */
 void
-websrv_sendSetCookieHeader(struct mg_connection *conn,
+websrv_sendSetCookieHeader(struct mg_connection* conn,
                            int returncode,
-                           const char *pcontent,
-                           const char *psid);
-
-
+                           const char* pcontent,
+                           const char* psid);
 
 ////////////////////////////////////////////////////////////////////////////////
 //                           ws1  Websocket handlers
 ////////////////////////////////////////////////////////////////////////////////
 
-
-
 int
-ws1_connectHandler(const struct mg_connection *conn, void *cbdata);
+ws1_connectHandler(const struct mg_connection* conn, void* cbdata);
 void
-ws1_readyHandler(struct mg_connection *conn, void *cbdata);
+ws1_readyHandler(struct mg_connection* conn, void* cbdata);
 int
-ws1_dataHandler(
-  struct mg_connection *conn, int bits, char *data, size_t len, void *cbdata);
+ws1_dataHandler(struct mg_connection* conn,
+                int bits,
+                char* data,
+                size_t len,
+                void* cbdata);
 void
-ws1_closeHandler(const struct mg_connection *conn, void *cbdata);
-
+ws1_closeHandler(const struct mg_connection* conn, void* cbdata);
 
 ////////////////////////////////////////////////////////////////////////////////
 //                           ws2  Websocket handlers
 ////////////////////////////////////////////////////////////////////////////////
 
 int
-ws2_connectHandler(const struct mg_connection *conn, void *cbdata);
+ws2_connectHandler(const struct mg_connection* conn, void* cbdata);
 void
-ws2_readyHandler(struct mg_connection *conn, void *cbdata);
+ws2_readyHandler(struct mg_connection* conn, void* cbdata);
 int
-ws2_dataHandler(
-  struct mg_connection *conn, int bits, char *data, size_t len, void *cbdata);
+ws2_dataHandler(struct mg_connection* conn,
+                int bits,
+                char* data,
+                size_t len,
+                void* cbdata);
 void
-ws2_closeHandler(const struct mg_connection *conn, void *cbdata);
+ws2_closeHandler(const struct mg_connection* conn, void* cbdata);
 
-
-#define WEBSRV_MAX_SESSIONS 1000        // Max web server active sessions
-#define WEBSRV_NAL_USERNAMELEN 128      // Max length for userdname
+#define WEBSRV_MAX_SESSIONS    1000 // Max web server active sessions
+#define WEBSRV_NAL_USERNAMELEN 128  // Max length for userdname
 
 /**
  * Invalid method page.
  */
 #define WEBSERVER_METHOD_ERROR                                                 \
-    "<html><head><title>Illegal request</title></head><body>Invalid "          \
-    "method.</body></html>"
+  "<html><head><title>Illegal request</title></head><body>Invalid "            \
+  "method.</body></html>"
 
 /**
  * Invalid URL page.
  */
 #define WEBSERVER_NOT_FOUND_ERROR                                              \
-    "<html><head><title>Not found</title></head><body>The page you are "       \
-    "looking for is not available on this server.</body></html>"
+  "<html><head><title>Not found</title></head><body>The page you are "         \
+  "looking for is not available on this server.</body></html>"
 
 /**
  * Start page
  */
 #define WEBSERVER_PAGE_MAIN                                                    \
-    "<html><head><title>VSCP Daemon</title></head><body>Welcome to the VSCP "  \
-    "Daemon.</body></html>"
+  "<html><head><title>VSCP Daemon</title></head><body>Welcome to the VSCP "    \
+  "Daemon.</body></html>"
 
 /**
  * Start page
  */
 #define WEBSERVER_PAGE                                                         \
-    "<html><head><title>VSCP Daemon</title></head><body>VSCP "                 \
-    "Daemon.</body></html>"
+  "<html><head><title>VSCP Daemon</title></head><body>VSCP "                   \
+  "Daemon.</body></html>"
 
 /**
  * Available in next version
  */
 #define NEXTVERSION_PAGE                                                       \
-    "<html><head><title>VSCP Daemon</title></head><body>Sorry this "           \
-    "functionality is not available until next version of VSCP & "             \
-    "Friends.</body></html>"
+  "<html><head><title>VSCP Daemon</title></head><body>Sorry this "             \
+  "functionality is not available until next version of VSCP & "               \
+  "Friends.</body></html>"
 
 /**
  * Invalid password
  */
 #define WEBSERVER_DENIED                                                       \
-    "<html><head><title>Access denied</title></head><body>Access "             \
-    "denied</body></html>"
+  "<html><head><title>Access denied</title></head><body>Access "               \
+  "denied</body></html>"
 
 /**
  * Name of our cookie.
@@ -165,20 +165,18 @@ ws2_closeHandler(const struct mg_connection *conn, void *cbdata);
 /**
  * State we keep for each user/session/browser.
  */
-struct websrv_session
-{
-    // Unique ID for this session.
-    char m_sid[33];
+struct websrv_session {
+  // Unique ID for this session.
+  char m_sid[33];
 
-    // Time when this session was last active.
-    time_t lastActiveTime;
+  // Time when this session was last active.
+  time_t lastActiveTime;
 
-    // Client item for this session
-    CClientItem *m_pClientItem;
+  // Client item for this session
+  CClientItem* m_pClientItem;
 
-    // User
-    CUserItem *m_pUserItem;
-
+  // User
+  CUserItem* m_pUserItem;
 };
 
 // Test Certificate
@@ -293,7 +291,8 @@ const char client_cert_pem[] =
   @return true on success
 */
 bool
-websrv_parseHeader(std::map<std::string,std::string> &hdrmap, std::string &header);
+websrv_parseHeader(std::map<std::string, std::string>& hdrmap,
+                   std::string& header);
 
 /*!
   Get a specific header element from a header map
@@ -303,10 +302,9 @@ websrv_parseHeader(std::map<std::string,std::string> &hdrmap, std::string &heade
   @return True on success.
 */
 bool
-websrv_getHeaderElement(std::map<std::string, 
-                          std::string> &hdrmap,
-                          const std::string &name,
-                          std::string &value);
+websrv_getHeaderElement(std::map<std::string, std::string>& hdrmap,
+                        const std::string& name,
+                        std::string& value);
 
 /*!
     This class implement the VSCP Webserver thread

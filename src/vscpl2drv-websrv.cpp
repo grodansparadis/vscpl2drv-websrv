@@ -33,21 +33,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <vscp.h>
 #include <hlo.h>
+#include <vscp.h>
 #include <vscphelper.h>
 
 #include "version.h"
 #include "vscpl2drv-websrv.h"
 #include "webobj.h"
 
-#include <json.hpp>  // Needs C++11  -std=c++11
+#include <json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
-#include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
@@ -76,7 +76,7 @@ static pthread_mutex_t g_mapMutex;
 void
 _init()
 {
-    pthread_mutex_init(&g_mapMutex, NULL);
+  pthread_mutex_init(&g_mapMutex, NULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -86,32 +86,32 @@ _init()
 void
 _fini()
 {
-    // If empty - nothing to do
-    if (g_ifMap.empty())
-        return;
+  // If empty - nothing to do
+  if (g_ifMap.empty())
+    return;
 
-    // Remove orphan objects
+  // Remove orphan objects
 
-    LOCK_MUTEX(g_mapMutex);
+  LOCK_MUTEX(g_mapMutex);
 
-    for (std::map<long, CWebObj*>::iterator it = g_ifMap.begin();
-         it != g_ifMap.end();
-         ++it) {
-        // std::cout << it->first << " => " << it->second << '\n';
+  for (std::map<long, CWebObj*>::iterator it = g_ifMap.begin();
+       it != g_ifMap.end();
+       ++it) {
+    // std::cout << it->first << " => " << it->second << '\n';
 
-        CWebObj* pif = it->second;
-        if (NULL != pif) {
-            //pif->m_srvRemoteSend.doCmdClose();
-            //pif->m_srvRemoteReceive.doCmdClose();
-            delete pif;
-            pif = NULL;
-        }
+    CWebObj* pif = it->second;
+    if (NULL != pif) {
+      // pif->m_srvRemoteSend.doCmdClose();
+      // pif->m_srvRemoteReceive.doCmdClose();
+      delete pif;
+      pif = NULL;
     }
+  }
 
-    g_ifMap.clear(); // Remove all items
+  g_ifMap.clear(); // Remove all items
 
-    UNLOCK_MUTEX(g_mapMutex);
-    pthread_mutex_destroy(&g_mapMutex);
+  UNLOCK_MUTEX(g_mapMutex);
+  pthread_mutex_destroy(&g_mapMutex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -121,24 +121,24 @@ _fini()
 long
 addDriverObject(CWebObj* pif)
 {
-    std::map<long, CWebObj*>::iterator it;
-    long h = 0;
+  std::map<long, CWebObj*>::iterator it;
+  long h = 0;
 
-    LOCK_MUTEX(g_mapMutex);
+  LOCK_MUTEX(g_mapMutex);
 
-    // Find free handle
-    while (true) {
-        if (g_ifMap.end() == (it = g_ifMap.find(h)))
-            break;
-        h++;
-    };
+  // Find free handle
+  while (true) {
+    if (g_ifMap.end() == (it = g_ifMap.find(h)))
+      break;
+    h++;
+  };
 
-    g_ifMap[h] = pif;
-    h += 1681;
+  g_ifMap[h] = pif;
+  h += 1681;
 
-    UNLOCK_MUTEX(g_mapMutex);
+  UNLOCK_MUTEX(g_mapMutex);
 
-    return h;
+  return h;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -148,19 +148,20 @@ addDriverObject(CWebObj* pif)
 CWebObj*
 getDriverObject(long h)
 {
-    std::map<long, CWebObj*>::iterator it;
-    long idx = h - 1681;
+  std::map<long, CWebObj*>::iterator it;
+  long idx = h - 1681;
 
-    // Check if valid handle
-    if (idx < 0)
-        return NULL;
-
-    it = g_ifMap.find(idx);
-    if (it != g_ifMap.end()) {
-        return it->second;
-    }
-
+  // Check if valid handle
+  if (idx < 0) {
     return NULL;
+  }
+
+  it = g_ifMap.find(idx);
+  if (it != g_ifMap.end()) {
+    return it->second;
+  }
+
+  return NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -170,25 +171,25 @@ getDriverObject(long h)
 void
 removeDriverObject(long h)
 {
-    std::map<long, CWebObj*>::iterator it;
-    long idx = h - 1681;
+  std::map<long, CWebObj*>::iterator it;
+  long idx = h - 1681;
 
-    // Check if valid handle
-    if (idx < 0) {
-        return;
-    }
+  // Check if valid handle
+  if (idx < 0) {
+    return;
+  }
 
-    LOCK_MUTEX(g_mapMutex);
-    it = g_ifMap.find(idx);
-    if (it != g_ifMap.end()) {
-        CWebObj* pObj = it->second;
-        if (NULL != pObj) {
-            delete pObj;
-            pObj = NULL;
-        }
-        g_ifMap.erase(it);
+  LOCK_MUTEX(g_mapMutex);
+  it = g_ifMap.find(idx);
+  if (it != g_ifMap.end()) {
+    CWebObj* pObj = it->second;
+    if (NULL != pObj) {
+      delete pObj;
+      pObj = NULL;
     }
-    UNLOCK_MUTEX(g_mapMutex);
+    g_ifMap.erase(it);
+  }
+  UNLOCK_MUTEX(g_mapMutex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -202,25 +203,24 @@ removeDriverObject(long h)
 extern "C" long
 VSCPOpen(const char* pPathConfig, const char* pguid)
 {
-    long h = 0;
+  long h = 0;
 
-    CWebObj* pdrvObj = new CWebObj();
-    if (NULL != pdrvObj) {
+  CWebObj* pdrvObj = new CWebObj();
+  if (NULL != pdrvObj) {
+    cguid guid(pguid);
+    std::string path = pPathConfig;
+    if (path.length() && pdrvObj->open(path, guid)) {
 
-        cguid guid(pguid);
-        std::string path = pPathConfig;
-        if (path.length() && pdrvObj->open(path, guid)) {
-
-            if (!(h = addDriverObject(pdrvObj))) {
-                delete pdrvObj;
-            }
-
-        } else {
-            delete pdrvObj;
-        }
+      if (!(h = addDriverObject(pdrvObj))) {
+        delete pdrvObj;
+      }
     }
+    else {
+      delete pdrvObj;
+    }
+  }
 
-    return h;
+  return h;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -230,13 +230,15 @@ VSCPOpen(const char* pPathConfig, const char* pguid)
 extern "C" int
 VSCPClose(long handle)
 {
-    CWebObj* pdrvObj = getDriverObject(handle);
-    if (NULL == pdrvObj)
-        return 0;
-    pdrvObj->close();
-    removeDriverObject(handle);
+  CWebObj* pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj) {
+    return 0;
+  }
 
-    return CANAL_ERROR_SUCCESS;
+  pdrvObj->close();
+  removeDriverObject(handle);
+
+  return CANAL_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -246,13 +248,14 @@ VSCPClose(long handle)
 extern "C" int
 VSCPWrite(long handle, const vscpEvent* pEvent, unsigned long timeout)
 {
-    CWebObj* pdrvObj = getDriverObject(handle);
-    if (NULL == pdrvObj)
-        return CANAL_ERROR_MEMORY;
+  CWebObj* pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj) {
+    return CANAL_ERROR_MEMORY;
+  }
 
-    pdrvObj->addEvent2SendQueue(pEvent);
+  pdrvObj->addEvent2SendQueue(pEvent);
 
-    return CANAL_ERROR_SUCCESS;
+  return CANAL_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -262,51 +265,51 @@ VSCPWrite(long handle, const vscpEvent* pEvent, unsigned long timeout)
 extern "C" int
 VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
 {
-    int rv = 0;
+  int rv = 0;
 
-    // Check pointer
-    if (NULL == pEvent)
-        return CANAL_ERROR_PARAMETER;
+  // Check pointer
+  if (NULL == pEvent) {
+    return CANAL_ERROR_PARAMETER;
+  }
 
-    CWebObj* pdrvObj = getDriverObject(handle);
-    if (NULL == pdrvObj)
-        return CANAL_ERROR_MEMORY;
+  CWebObj* pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj) {
+    return CANAL_ERROR_MEMORY;
+  }
 
-    struct timespec ts;
-    ts.tv_sec = 0;
-    ts.tv_nsec = timeout * 1000;
-    if (-1 == (rv = sem_timedwait(&pdrvObj->m_semReceiveQueue, &ts))) {
-        if (ETIMEDOUT == errno) {
-            return CANAL_ERROR_TIMEOUT;
-        } 
-        else if (EINTR == errno) {
-            spdlog::get("logger")->error(" Interrupted by a signal handler");
-            return CANAL_ERROR_INTERNAL;
-        } 
-        else if (EINVAL == errno) {
-            spdlog::get("logger")->error(" Invalid semaphore (timout)");
-            return CANAL_ERROR_INTERNAL;
-        } 
-        else if (EAGAIN == errno) {
-            spdlog::get("logger")->error(" Blocking error");
-            return CANAL_ERROR_INTERNAL;
-        } 
-        else {
-            spdlog::get("logger")->error(" Unknown error");
-            return CANAL_ERROR_INTERNAL;
-        }
+  if (-1 == (rv = vscp_sem_wait(&pdrvObj->m_semReceiveQueue, timeout))) {
+    if (ETIMEDOUT == errno) {
+      return CANAL_ERROR_TIMEOUT;
     }
+    else if (EINTR == errno) {
+      spdlog::get("logger")->error(" Interrupted by a signal handler");
+      return CANAL_ERROR_INTERNAL;
+    }
+    else if (EINVAL == errno) {
+      spdlog::get("logger")->error(" Invalid semaphore (timout)");
+      return CANAL_ERROR_INTERNAL;
+    }
+    else if (EAGAIN == errno) {
+      spdlog::get("logger")->error(" Blocking error");
+      return CANAL_ERROR_INTERNAL;
+    }
+    else {
+      spdlog::get("logger")->error(" Unknown error");
+      return CANAL_ERROR_INTERNAL;
+    }
+  }
 
-    pthread_mutex_lock(&pdrvObj->m_mutexReceiveQueue);
-    vscpEvent* pLocalEvent = pdrvObj->m_receiveList.front();
-    pdrvObj->m_receiveList.pop_front();
-    pthread_mutex_unlock(&pdrvObj->m_mutexReceiveQueue);
-    if (NULL == pLocalEvent) return CANAL_ERROR_MEMORY;
+  pthread_mutex_lock(&pdrvObj->m_mutexReceiveQueue);
+  vscpEvent* pLocalEvent = pdrvObj->m_receiveList.front();
+  pdrvObj->m_receiveList.pop_front();
+  pthread_mutex_unlock(&pdrvObj->m_mutexReceiveQueue);
+  if (NULL == pLocalEvent)
+    return CANAL_ERROR_MEMORY;
 
-    vscp_copyEvent(pEvent, pLocalEvent);
-    vscp_deleteEvent(pLocalEvent);
+  vscp_copyEvent(pEvent, pLocalEvent);
+  vscp_deleteEvent(pLocalEvent);
 
-    return CANAL_ERROR_SUCCESS;
+  return CANAL_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -316,9 +319,7 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
 extern "C" unsigned long
 VSCPGetVersion(void)
 {
-    unsigned long ver = MAJOR_VERSION << 24 | MINOR_VERSION << 16 |
-                        RELEASE_VERSION << 8 | BUILD_VERSION;
-    return ver;
+  unsigned long ver = MAJOR_VERSION << 24 | MINOR_VERSION << 16 |
+                      RELEASE_VERSION << 8 | BUILD_VERSION;
+  return ver;
 }
-
-

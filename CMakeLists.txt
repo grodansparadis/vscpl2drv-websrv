@@ -162,7 +162,6 @@ configure_file(
  
 ENDIF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 
-
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # pthreads
@@ -183,7 +182,6 @@ else()
 endif()
 
 # Set sockettcp build flags
-add_definitions(-DUSE_IPV6)
 string(FIND "${OPENSSL_VERSION}" "1.1." SSL_VER_POS)
 if(${SSL_VER_POS})
     add_definitions(-DOPENSSL_API_1_0)
@@ -193,18 +191,18 @@ endif()
 
 # Civetweb defines
 #add_definitions(-DDEBUG_TRACE)
-#add_definitions(-DUSE_IPV6)
+add_definitions(-DUSE_IPV6)
 add_definitions(-DUSE_WEBSOCKET)
-#add_definitions(-DLUA_COMPAT_ALL)
+add_definitions(-DLUA_COMPAT_ALL)
 add_definitions(-DUSE_LUA)
 add_definitions(-DUSE_LUA_SQLITE3)
 add_definitions(-DUSE_LUA_FILE_SYSTEM)
 add_definitions(-DUSE_DUKTAPE)
-#add_definitions(-DUSE_SERVER_STATS)
+add_definitions(-DUSE_SERVER_STATS)
 add_definitions(-DUSE_ZLIB)
-#add_definitions(-DUSE_HTTP2)
+add_definitions(-DUSE_HTTP2)
 add_definitions(-DUSE_4_CGI)
-#add_definitions(-DUSE_TIMERS)
+add_definitions(-DUSE_TIMERS)
 #add_definitions(-DUSE_X_DOM_SOCKET)
 
 set(RESOURCE_FILES
@@ -238,6 +236,7 @@ add_library(vscpl2drv-websrv
     ${VSCP_PATH}/src/vscp/common/clientlist.h
     ${VSCP_PATH}/src/vscp/common/clientlist.cpp    
     ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/civetweb.c
+    ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/mod_lua.inl
     ${VSCP_PATH}/src/common/third_party/mustache.hpp
     ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
     ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/duktape.c 

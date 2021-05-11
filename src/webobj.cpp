@@ -1143,7 +1143,7 @@ CWebObj::doLoadConfig(void)
 
     if (j.contains("request-timeout-ms") &&
         j["request-timeout-ms"].is_number()) {
-      m_web_keep_alive_timeout_ms = j["request-timeout-ms"].get<long>();
+      m_web_request_timeout_ms = j["request-timeout-ms"].get<long>();
     }
 
     // linger-timeout-ms : "",

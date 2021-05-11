@@ -109,5 +109,27 @@
     "editor.wordBasedSuggestions": true,
 
     // Enable parameter hints
-    "editor.parameterHints.enabled": true
+    "editor.parameterHints.enabled": true,
+    "cSpell.words": [
+        "auth",
+        "config",
+        "debug",
+        "file",
+        "get",
+        "global",
+        "logger",
+        "lua",
+        "m",
+        "name",
+        "obj",
+        "p",
+        "page",
+        "pattern",
+        "patterns",
+        "server",
+        "settings",
+        "spdlog",
+        "vscpdb",
+        "web"
+    ]
 }

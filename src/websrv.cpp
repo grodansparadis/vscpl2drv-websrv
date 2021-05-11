@@ -2122,7 +2122,7 @@ BXHandler(struct mg_connection* conn, void* cbdata)
             "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: "
             "close\r\n\r\n");
   mg_printf(conn, "<html><body>");
-  mg_printf(conn, "<h2>This is the BX handler %p!!!</h2>", cbdata);
+  mg_printf(conn, "<h2>This is the BX handler !!!</h2>");
   mg_printf(conn, "<p>The actual uri is %s</p>", req_info->local_uri);
   mg_printf(conn, "</body></html>\n");
 
@@ -2949,19 +2949,31 @@ start_webserver(void* cbdata)
   web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DOCUMENT_ROOT + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_document_root.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_DOCUMENT_ROOT,
+                               pObj->m_web_document_root);
 
   web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LISTENING_PORTS + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_listening_ports.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LISTENING_PORTS,
+                               pObj->m_web_listening_ports);  
 
   web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_INDEX_FILES + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_index_files.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_INDEX_FILES,
+                               pObj->m_web_index_files);   
 
   web_options[pos++] =
     vscp_strdup(VSCPDB_CONFIG_NAME_WEB_AUTHENTICATION_DOMAIN + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_authentication_domain.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_AUTHENTICATION_DOMAIN,
+                               pObj->m_web_authentication_domain);  
 
   // Set only if not default value
   if (!pObj->m_enable_auth_domain_check) {
@@ -2969,20 +2981,32 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_AUTH_DOMAIN_CHECK + 4);
     if (pObj->m_enable_auth_domain_check) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_AUTH_DOMAIN_CHECK,
+                               "yes");  
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_AUTH_DOMAIN_CHECK,
+                               "no");
     }
   }
 
   web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CERTIFICATE + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_ssl_certificate.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_CERTIFICATE,
+                               pObj->m_web_ssl_certificate);   
 
   web_options[pos++] =
     vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CERTIFICAT_CHAIN + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_ssl_certificate_chain.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_CERTIFICAT_CHAIN,
+                               pObj->m_web_ssl_certificate_chain);  
 
   // Set only if not default value
   if (pObj->m_web_ssl_verify_peer) {
@@ -2990,9 +3014,15 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_PEER + 4);
     if (pObj->m_web_ssl_verify_peer) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_PEER,
+                               "yes"); 
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_PEER,
+                               "no"); 
     }
   }
 
@@ -3000,12 +3030,18 @@ start_webserver(void* cbdata)
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CA_PATH + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_ssl_ca_path.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_CA_PATH,
+                               pObj->m_web_ssl_ca_path);  
   }
 
   if (pObj->m_web_ssl_ca_file.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CA_FILE + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_ssl_ca_file.c_str());
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_CA_FILE,
+                               pObj->m_web_ssl_ca_file);  
   }
 
   if (pObj->m_web_ssl_verify_depth !=
@@ -3015,6 +3051,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_DEPTH + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_VERIFY_DEPTH,
+                               str); 
   }
 
   if (!pObj->m_web_ssl_default_verify_paths) {
@@ -3022,15 +3061,24 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_DEFAULT_VERIFY_PATHS + 4);
     if (pObj->m_web_ssl_default_verify_paths) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_DEFAULT_VERIFY_PATHS,
+                               "yes"); 
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_DEFAULT_VERIFY_PATHS,
+                               "no"); 
     }
   }
 
   web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_CHIPHER_LIST + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_ssl_cipher_list.c_str());
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_CHIPHER_LIST,
+                               pObj->m_web_ssl_cipher_list);
 
   if (pObj->m_web_ssl_protocol_version !=
       atoi(VSCPDB_CONFIG_DEFAULT_WEB_SSL_PROTOCOL_VERSION)) {
@@ -3039,6 +3087,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_PROTOCOL_VERSION + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_PROTOCOL_VERSION,
+                               str);
   }
 
   if (!pObj->m_web_ssl_short_trust) {
@@ -3046,9 +3097,16 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSL_SHORT_TRUST + 4);
     if (pObj->m_web_ssl_short_trust) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_SHORT_TRUST,
+                               "yes");
+
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSL_SHORT_TRUST,
+                               "no");
     }
   }
 
@@ -3057,12 +3115,18 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_CGI_INTERPRETER + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_cgi_interpreter.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_CGI_INTERPRETER,
+                               pObj->m_web_cgi_interpreter);  
   }
 
   if (pObj->m_web_cgi_patterns.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_CGI_PATTERN + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_cgi_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_CGI_PATTERN,
+                               pObj->m_web_cgi_patterns);   
   }
 
   if (pObj->m_web_cgi_environment.length()) {
@@ -3070,17 +3134,26 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_CGI_ENVIRONMENT + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_cgi_environment.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_CGI_ENVIRONMENT,
+                               pObj->m_web_cgi_environment);  
   }
 
   if (pObj->m_web_protect_uri.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_PROTECT_URI + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_protect_uri.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_PROTECT_URI,
+                               pObj->m_web_protect_uri);   
   }
 
   if (pObj->m_web_throttle.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_TROTTLE + 4);
     web_options[pos++] = vscp_strdup((const char*)pObj->m_web_throttle.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_TROTTLE,
+                               pObj->m_web_throttle); 
   }
 
   if (!pObj->m_web_enable_directory_listing) {
@@ -3088,9 +3161,15 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_DIRECTORY_LISTING + 4);
     if (pObj->m_web_enable_directory_listing) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_DIRECTORY_LISTING,
+                               "yes"); 
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_DIRECTORY_LISTING,
+                               "no"); 
     }
   }
 
@@ -3099,9 +3178,15 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_KEEP_ALIVE + 4);
     if (pObj->m_web_enable_keep_alive) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_KEEP_ALIVE,
+                               "yes");
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_KEEP_ALIVE,
+                               "no");
     }
   }
 
@@ -3112,6 +3197,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_KEEP_ALIVE_TIMEOUT_MS + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_KEEP_ALIVE_TIMEOUT_MS,
+                               str);
   }
 
   if (pObj->m_web_access_control_list.length()) {
@@ -3119,6 +3207,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_LIST + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_access_control_list.c_str());
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_LIST,
+                               pObj->m_web_access_control_list);
   }
 
   if (pObj->m_web_extra_mime_types.length()) {
@@ -3126,6 +3217,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_EXTRA_MIME_TYPES + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_extra_mime_types.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_EXTRA_MIME_TYPES,
+                               pObj->m_web_extra_mime_types);  
   }
 
   if (pObj->m_web_num_threads != atoi(VSCPDB_CONFIG_DEFAULT_WEB_NUM_THREADS)) {
@@ -3133,6 +3227,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_EXTRA_MIME_TYPES + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_EXTRA_MIME_TYPES,
+                               str); 
   }
 
   if (pObj->m_web_url_rewrite_patterns.length()) {
@@ -3140,6 +3237,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_URL_REWRITE_PATTERNS + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_url_rewrite_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_URL_REWRITE_PATTERNS,
+                               pObj->m_web_url_rewrite_patterns);   
   }
 
   if (pObj->m_web_hide_file_patterns.length()) {
@@ -3147,6 +3247,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_URL_REWRITE_PATTERNS + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_hide_file_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_URL_REWRITE_PATTERNS,
+                               pObj->m_web_hide_file_patterns);    
   }
 
   if (pObj->m_web_request_timeout_ms !=
@@ -3156,6 +3259,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_REQUEST_TIMEOUT_MS + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_REQUEST_TIMEOUT_MS,
+                               str); 
   }
 
   if (-1 != pObj->m_web_linger_timeout_ms) {
@@ -3164,15 +3270,24 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LINGER_TIMEOUT_MS + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LINGER_TIMEOUT_MS,
+                               str); 
   }
 
   if (!pObj->m_web_decode_url) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DECODE_URL + 4);
     if (pObj->m_web_decode_url) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_DECODE_URL,
+                               "yes"); 
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_DECODE_URL,
+                               "no"); 
     }
   }
 
@@ -3181,6 +3296,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_GLOBAL_AUTHFILE + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_global_auth_file.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_GLOBAL_AUTHFILE,
+                               pObj->m_web_global_auth_file);   
   }
 
   if (pObj->m_web_per_directory_auth_file.length()) {
@@ -3188,12 +3306,18 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_PER_DIRECTORY_AUTH_FILE + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_per_directory_auth_file.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_PER_DIRECTORY_AUTH_FILE,
+                               pObj->m_web_per_directory_auth_file);    
   }
 
   if (pObj->m_web_ssi_patterns.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_SSI_PATTERNS + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_ssi_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_SSI_PATTERNS,
+                               pObj->m_web_ssi_patterns);    
   }
 
   if (pObj->m_web_access_control_allow_origin.length()) {
@@ -3201,6 +3325,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_ORIGIN + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_access_control_allow_origin.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_ORIGIN,
+                               pObj->m_web_access_control_allow_origin);   
   }
 
   if (pObj->m_web_access_control_allow_methods.length()) {
@@ -3208,6 +3335,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_METHODS + 4);
     web_options[pos++] = vscp_strdup(
       (const char*)pObj->m_web_access_control_allow_methods.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_METHODS,
+                               pObj->m_web_access_control_allow_methods);   
   }
 
   if (pObj->m_web_access_control_allow_headers.length()) {
@@ -3215,25 +3345,37 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_HEADERS + 4);
     web_options[pos++] = vscp_strdup(
       (const char*)pObj->m_web_access_control_allow_headers.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ACCESS_CONTROL_ALLOW_HEADERS,
+                               pObj->m_web_access_control_allow_headers);  
   }
 
   if (pObj->m_web_error_pages.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ERROR_PAGES + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_error_pages.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ERROR_PAGES,
+                               pObj->m_web_error_pages);   
   }
 
   if (-1 != pObj->m_web_tcp_nodelay) {
     std::string str = vscp_str_format(("%ld"), (long)pObj->m_web_tcp_nodelay);
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_TCP_NO_DELAY + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_TCP_NO_DELAY,
+                               str);  
   }
 
   if (pObj->m_web_static_file_cache_control.length()) {
     web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ERROR_PAGES + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_static_file_cache_control.c_str());
-  }
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ERROR_PAGES,
+                               pObj->m_web_static_file_cache_control);  
+  }  
 
   if (pObj->m_web_static_file_max_age !=
       atol(VSCPDB_CONFIG_DEFAULT_WEB_STATIC_FILE_MAX_AGE)) {
@@ -3242,6 +3384,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_STATIC_FILE_MAX_AGE + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_DEFAULT_WEB_STATIC_FILE_MAX_AGE,
+                               str);
   }
 
   if (-1 != pObj->m_web_strict_transport_security_max_age) {
@@ -3251,6 +3396,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_STRICT_TRANSPORT_SECURITY_MAX_AGE + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_STRICT_TRANSPORT_SECURITY_MAX_AGE,
+                               str); 
   }
 
   if (!pObj->m_web_allow_sendfile_call) {
@@ -3258,9 +3406,15 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ALLOW_SENDFILE_CALL + 4);
     if (pObj->m_web_allow_sendfile_call) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ALLOW_SENDFILE_CALL,
+                               "yes");
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ALLOW_SENDFILE_CALL,
+                               "no");
     }
   }
 
@@ -3269,6 +3423,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ADDITIONAL_HEADERS + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_additional_header.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ADDITIONAL_HEADERS,
+                               pObj->m_web_additional_header);  
   }
 
   if (pObj->m_web_max_request_size !=
@@ -3278,6 +3435,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_MAX_REQUEST_SIZE + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_DEFAULT_WEB_MAX_REQUEST_SIZE,
+                               str); 
   }
 
   if (pObj->m_web_allow_index_script_resource) {
@@ -3285,9 +3445,15 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ALLOW_INDEX_SCRIPT_RESOURCE + 4);
     if (pObj->m_web_allow_index_script_resource) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ALLOW_INDEX_SCRIPT_RESOURCE,
+                               "yes");  
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ALLOW_INDEX_SCRIPT_RESOURCE,
+                               "no");  
     }
   }
 
@@ -3296,6 +3462,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DUKTAPE_SCRIPT_PATTERN + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_duktape_script_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_DUKTAPE_SCRIPT_PATTERN,
+                               pObj->m_web_duktape_script_patterns);   
   }
 
   if (pObj->m_web_lua_preload_file.length()) {
@@ -3303,6 +3472,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_PRELOAD_FILE + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_lua_preload_file.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LUA_PRELOAD_FILE,
+                               pObj->m_web_lua_preload_file);    
   }
 
   if (pObj->m_web_lua_script_patterns.length()) {
@@ -3310,6 +3482,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_SCRIPT_PATTERN + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_lua_script_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LUA_SCRIPT_PATTERN,
+                               pObj->m_web_lua_script_patterns);  
   }
 
   if (pObj->m_web_lua_server_page_patterns.length()) {
@@ -3317,6 +3492,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_SERVER_PAGE_PATTERN + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_lua_server_page_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LUA_SERVER_PAGE_PATTERN,
+                               pObj->m_web_lua_server_page_patterns);   
   }
 
   if (pObj->m_web_lua_websocket_patterns.length()) {
@@ -3324,6 +3502,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_WEBSOCKET_PATTERN + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_lua_websocket_patterns.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LUA_WEBSOCKET_PATTERN,
+                               pObj->m_web_lua_websocket_patterns);     
   }
 
   if (pObj->m_web_lua_background_script.length()) {
@@ -3331,6 +3512,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_BACKGROUND_SCRIPT + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_web_lua_background_script.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LUA_BACKGROUND_SCRIPT,
+                               pObj->m_web_lua_background_script);   
   }
 
   if (pObj->m_web_lua_background_script_params.length()) {
@@ -3338,6 +3522,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEB_LUA_BACKGROUND_SCRIPT_PARAMS + 4);
     web_options[pos++] = vscp_strdup(
       (const char*)pObj->m_web_lua_background_script_params.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_LUA_BACKGROUND_SCRIPT_PARAMS,
+                               pObj->m_web_lua_background_script_params);    
   }
 
   if (pObj->m_websocket_document_root.length()) {
@@ -3345,6 +3532,9 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_DOCUMENT_ROOT + 4);
     web_options[pos++] =
       vscp_strdup((const char*)pObj->m_websocket_document_root.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEBSOCKET_DOCUMENT_ROOT,
+                               pObj->m_websocket_document_root);     
   }
 
   if (pObj->m_websocket_timeout_ms !=
@@ -3354,6 +3544,9 @@ start_webserver(void* cbdata)
     web_options[pos++] =
       vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_TIMEOUT_MS + 4);
     web_options[pos++] = vscp_strdup((const char*)str.c_str());
+    spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEBSOCKET_TIMEOUT_MS,
+                               str);
   }
 
   if (pObj->bEnable_websocket_ping_pong) {
@@ -3361,9 +3554,15 @@ start_webserver(void* cbdata)
       vscp_strdup(VSCPDB_CONFIG_NAME_WEBSOCKET_PING_PONG_ENABLE + 4);
     if (pObj->bEnable_websocket_ping_pong) {
       web_options[pos++] = vscp_strdup("yes");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEBSOCKET_PING_PONG_ENABLE,
+                               "yes");
     }
     else {
       web_options[pos++] = vscp_strdup("no");
+      spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEBSOCKET_PING_PONG_ENABLE,
+                               "no");
     }
   }
 
@@ -3411,9 +3610,9 @@ start_webserver(void* cbdata)
   mg_set_request_handler(pObj->m_web_ctx, "/A/B", ABHandler, cbdata);
 
   // Add handler for /B, /B/A, /B/B but not for /B*
-  mg_set_request_handler(pObj->m_web_ctx, "/B$", BXHandler, (void*)0);
-  mg_set_request_handler(pObj->m_web_ctx, "/B/A$", BXHandler, (void*)1);
-  mg_set_request_handler(pObj->m_web_ctx, "/B/B$", BXHandler, (void*)2);
+  mg_set_request_handler(pObj->m_web_ctx, "/B$", BXHandler, cbdata);
+  mg_set_request_handler(pObj->m_web_ctx, "/B/A$", BXHandler, cbdata);
+  mg_set_request_handler(pObj->m_web_ctx, "/B/B$", BXHandler, cbdata);
 
   // Add handler for all files with .foo extention
   mg_set_request_handler(pObj->m_web_ctx, "**.foo$", FooHandler, cbdata);

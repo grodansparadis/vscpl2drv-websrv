@@ -215,11 +215,13 @@ websock_authentication(struct mg_connection* conn,
     return false;
   }
 
+  // Get IV
   if (0 == vscp_hexStr2ByteArray(iv, 16, (const char*)strIV.c_str())) {
     spdlog::get("logger")->error("[ws] Authentication: No room for iv block. ");
     return false; // Not enough room in buffer
   }
 
+  // Get AES128(username:password)
   size_t len;
   if (0 == (len = vscp_hexStr2ByteArray(secret,
                                         strCrypto.length(),
@@ -237,7 +239,9 @@ websock_authentication(struct mg_connection* conn,
                          pSession->m_pParent->m_vscp_key,
                          iv);
 
+  spdlog::get("logger")->debug("[ws] Buf: {} ", buf);
   std::string str = std::string((const char*)buf);
+  spdlog::get("logger")->debug("[ws] Decrypted: {} ", str);
   std::deque<std::string> tokens;
   vscp_split(tokens, str, ":");
 
@@ -282,7 +286,8 @@ websock_authentication(struct mg_connection* conn,
     return false;
   }
 
-  if (!vscp_isPasswordValid(pUserItem->getPassword(), strPassword)) {
+  std::string combined_credentials = strUser + ":" + strPassword;
+  if (!vscp_isPasswordValid(pUserItem->getPassword(), combined_credentials)) {
     spdlog::get("logger")->error("[ws] Authentication: User {} at host "
                                  "[{}] gave wrong password.",
                                  (const char*)strUser.c_str(),

@@ -262,8 +262,8 @@ CWebObj::open(std::string& path, const cguid& guid)
 
   // Read configuration file
   if (!doLoadConfig()) {
-    spdlog::get("logger")->critical("Failed to load configuration file [%s]",
-                                    path.c_str());
+    spdlog::get("logger")->critical("Failed to load configuration file [{}]",
+                                    path);
     return false;
   }
 
@@ -314,19 +314,24 @@ CWebObj::close(void)
 bool
 CWebObj::readEncryptionKey(const std::string& path)
 {
+  bool rv = false; // Be negative today
+
   try {
+    std::string vscpkey;
     std::ifstream in(path, std::ifstream::in);
     std::stringstream strStream;
     strStream << in.rdbuf();
-    return vscp_hexStr2ByteArray(m_vscp_key, 32, strStream.str().c_str());
+    vscpkey = strStream.str();
+    vscp_trim(vscpkey);
+    spdlog::get("logger")->debug("vscp.key [{}]", vscpkey.c_str());
+    rv = vscp_hexStr2ByteArray(m_vscp_key, 32, vscpkey.c_str());
   }
   catch (...) {
-    spdlog::get("logger")->error("Failed to read encryption key file [%s]",
+    spdlog::get("logger")->error("Failed to read encryption key file [{}]",
                                  m_path.c_str());
-    return false;
   }
 
-  return true;
+  return rv;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1740,14 +1745,17 @@ CWebObj::doLoadConfig(void)
           m_web_ssl_cache_timeout = jj["ssl-cache-timeout"].get<long>();
         }
         catch (const std::exception& ex) {
-          spdlog::error("Failed to read 'ssl-cache-timeout' Error='{}'", ex.what());
+          spdlog::error("Failed to read 'ssl-cache-timeout' Error='{}'",
+                        ex.what());
         }
         catch (...) {
-          spdlog::error("Failed to read 'ssl-cache-timeout' due to unknown error.");
+          spdlog::error(
+            "Failed to read 'ssl-cache-timeout' due to unknown error.");
         }
       }
       else {
-        spdlog::debug(" Failed to read 'ssl-cache-timeout' Defaults will be used.");
+        spdlog::debug(
+          " Failed to read 'ssl-cache-timeout' Defaults will be used.");
       }
 
     } // TLS
@@ -2016,7 +2024,7 @@ CWebObj::doLoadConfig(void)
 //     fp = fopen(m_path.c_str(), "r");
 //     if (NULL == fp) {
 //         spdlog::get("logger")->error(
-//                "Failed to open configuration file [%s]",
+//                "Failed to open configuration file [{}]",
 //                m_path.c_str());
 //         return false;
 //     }
@@ -2087,14 +2095,14 @@ CWebObj::doLoadConfig(void)
 //     fp = fopen(m_path.c_str(), "w");
 //     if (NULL == fp) {
 //         spdlog::get("logger")->error(
-//                "Failed to open configuration file [%s] for write",
+//                "Failed to open configuration file [{}] for write",
 //                m_path.c_str());
 //         return false;
 //     }
 
 //     if ( strlen(buf) != fwrite( buf, sizeof(char), strlen(buf), fp ) ) {
 //         spdlog::get("logger")->error(
-//                "Failed to write configuration file [%s] ",
+//                "Failed to write configuration file [{}] ",
 //                m_path.c_str());
 //         fclose (fp);
 //         return false;
@@ -2380,7 +2388,7 @@ retry_send_connect:
   //                                 pObj->m_usernameRemote,
   //                                 pObj->m_passwordRemote)) {
   //     spdlog::get("logger")->error(
-  //            "%s %s ",
+  //            "{} {} ",
   //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //            (const char*)"Error while opening remote VSCP TCP/IP "
   //                         "interface. Terminating!");
@@ -2397,7 +2405,7 @@ retry_send_connect:
   // }
 
   // spdlog::get("logger")->error(
-  //        "%s %s ",
+  //        "{} {} ",
   //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //        (const char*)"Connect to remote VSCP TCP/IP interface [SEND].");
 
@@ -2413,7 +2421,7 @@ retry_send_connect:
   //             bRemoteConnectionLost = true;
   //             pObj->m_srvRemoteSend.doCmdClose();
   //             spdlog::get("logger")->error(
-  //                    "%s %s ",
+  //                    "{} {} ",
   //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //                    (const char*)"Lost connection to remote host [SEND].");
   //         }
@@ -2427,7 +2435,7 @@ retry_send_connect:
   //                                         pObj->m_usernameRemote,
   //                                         pObj->m_passwordRemote)) {
   //             spdlog::get("logger")->error(
-  //                    "%s %s ",
+  //                    "{} {} ",
   //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //                    (const char*)"Reconnected to remote host [SEND].");
 
@@ -2480,7 +2488,7 @@ retry_send_connect:
   // pObj->m_srvRemoteSend.doCmdClose();
 
   // spdlog::get("logger")->error(
-  //        "%s %s ",
+  //        "{} {} ",
   //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //        (const char*)"Disconnect from remote VSCP TCP/IP interface
   //        [SEND].");
@@ -2517,7 +2525,7 @@ retry_receive_connect:
   //                                         pObj->m_usernameRemote,
   //                                         pObj->m_passwordRemote)) {
   //     spdlog::get("logger")->error(
-  //            "%s %s ",
+  //            "{} {} ",
   //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //            (const char*)"Error while opening remote VSCP TCP/IP "
   //                         "interface. Terminating!");
@@ -2534,7 +2542,7 @@ retry_receive_connect:
   // }
 
   // spdlog::get("logger")->error(
-  //        "%s %s ",
+  //        "{} {} ",
   //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //        (const char*)"Connect to remote VSCP TCP/IP interface [RECEIVE].");
 
@@ -2542,7 +2550,7 @@ retry_receive_connect:
   // if (VSCP_ERROR_SUCCESS !=
   //     pObj->m_srvRemoteReceive.doCmdFilter(&pObj->m_rxfilter)) {
   //     spdlog::get("logger")->error(
-  //            "%s %s ",
+  //            "{} {} ",
   //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //            (const char*)"Failed to set receiving filter.");
   // }
@@ -2563,7 +2571,7 @@ retry_receive_connect:
 
   //             bRemoteConnectionLost = true;
   //             pObj->m_srvRemoteReceive.doCmdClose();
-  //             spdlog::get("logger")->error( "%s %s ",
+  //             spdlog::get("logger")->error( "{} {} ",
   //             VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //                         (const char*)"Lost connection to remote host
   //                         [Receive].");
@@ -2578,7 +2586,7 @@ retry_receive_connect:
   //                                                 pObj->m_usernameRemote,
   //                                                 pObj->m_passwordRemote)) {
   //             spdlog::get("logger")->error(
-  //                    "%s %s ",
+  //                    "{} {} ",
   //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //                    (const char*)"Reconnected to remote host [Receive].");
   //             bRemoteConnectionLost = false;
@@ -2620,7 +2628,7 @@ retry_receive_connect:
   // // Close the channel
   // pObj->m_srvRemoteReceive.doCmdClose();
 
-  // spdlog::get("logger")->error("%s %s ",
+  // spdlog::get("logger")->error("{} {} ",
   //   VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
   //   (const char*)"Disconnect from remote VSCP TCP/IP interface [RECEIVE].");
 

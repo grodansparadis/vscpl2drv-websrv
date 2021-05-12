@@ -367,8 +367,9 @@ restsrv_error(struct mg_connection* conn,
   int returncode = 200;
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return;
+  }
 
   spdlog::get("logger")->debug("[REST] error format={} errorcode={}",
                                format,
@@ -465,8 +466,9 @@ restsrv_get_session(struct mg_connection* conn, std::string& sid, void* cbdata)
   const struct mg_request_info* reqinfo;
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return NULL;
+  }
 
   // Check pointers
   if (!conn || !(reqinfo = mg_get_request_info(conn))) {
@@ -519,8 +521,9 @@ restsrv_add_session(struct mg_connection* conn,
   }
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return NULL;
+  }
 
   // !!!!! This blokc is not used at the moment !!!
   // Parse "Authorization:" header, fail fast on parse error
@@ -613,8 +616,9 @@ restsrv_expire_sessions(struct mg_connection* conn, void* cbdata)
   time_t now;
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return;
+  }
 
   now = time(NULL);
 
@@ -666,8 +670,9 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
   CUserItem* pUserItem             = NULL;
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return WEB_ERROR;
+  }
 
   memset(bufBody, 0, sizeof(bufBody));
 
@@ -953,7 +958,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
       (1 == pUserItem->isAllowedToConnect(inet_addr(reqinfo->remote_addr)));
     pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
-
+      
       std::string strErr = vscp_str_format(
         "[REST Client] Host [%s] NOT allowed to connect. User [%s]",
         reqinfo->remote_addr,
@@ -1292,8 +1297,9 @@ restsrv_doOpen(struct mg_connection* conn,
   char wrkbuf[256];
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return;
+  }
 
   if (NULL != pSession) {
 
@@ -1464,8 +1470,9 @@ restsrv_doClose(struct mg_connection* conn,
   char wrkbuf[256];
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return;
+  }
 
   if (NULL != pSession) {
 
@@ -1572,8 +1579,9 @@ restsrv_doStatus(struct mg_connection* conn,
   char wrkbuf[256];
 
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return;
+  }
 
   if (NULL != pSession) {
 
@@ -1715,11 +1723,14 @@ restsrv_doSendEvent(struct mg_connection* conn,
   bool bSent = false;
 
   // Check pointer
-  if (NULL == conn)
+  if (NULL == conn) {
     return;
+  }
+
   CWebObj* pObj = (CWebObj*)cbdata;
-  if (NULL == cbdata)
+  if (NULL == pObj) {
     return;
+  }
 
   if (NULL != pSession) {
 

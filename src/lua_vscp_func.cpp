@@ -1145,7 +1145,7 @@ lua_vscp_sendEvent(struct lua_State* L)
     pEvent->pdata = NULL;
     vscp_convertEventExToEvent(pEvent, &ex);
 
-    if (!pObj->sendEvent(pEvent)) {
+    if (!pObj->eventToReceiveQueue(pEvent)) {
         // Failed to send event
         vscp_deleteEvent_v2(&pEvent);
         return luaL_error(L, "vscp.sendEvent: Failed to send event!");

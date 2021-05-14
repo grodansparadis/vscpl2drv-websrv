@@ -958,7 +958,7 @@ websrv_restapi(struct mg_connection* conn, void* cbdata)
       (1 == pUserItem->isAllowedToConnect(inet_addr(reqinfo->remote_addr)));
     pthread_mutex_unlock(&pObj->m_mutex_UserList);
     if (!bValidHost) {
-      
+
       std::string strErr = vscp_str_format(
         "[REST Client] Host [%s] NOT allowed to connect. User [%s]",
         reqinfo->remote_addr,
@@ -1771,14 +1771,18 @@ restsrv_doSendEvent(struct mg_connection* conn,
               vscp_copyEvent(pNewEvent, pEvent);
 
               // Add the new event to the input queue
-              pthread_mutex_lock(
-                &pSession->m_pClientItem->m_mutexClientInputQueue);
-              pSession->m_pClientItem->m_clientInputQueue.push_back(pNewEvent);
-              pthread_mutex_unlock(
-                &pSession->m_pClientItem->m_mutexClientInputQueue);
-              sem_post(&pSession->m_pClientItem->m_semClientInputQueue);
+              // pthread_mutex_lock(
+              //   &pSession->m_pClientItem->m_mutexClientInputQueue);
+              // pSession->m_pClientItem->m_clientInputQueue.push_back(pNewEvent);
+              // pthread_mutex_unlock(
+              //   &pSession->m_pClientItem->m_mutexClientInputQueue);
+              // sem_post(&pSession->m_pClientItem->m_semClientInputQueue);
+              if (!pObj->eventToReceiveQueue(pNewEvent)) {
+                spdlog::get("logger")->error("[REST] Failed to send event");  
+              }
 
               bSent = true;
+              
             }
             else {
               bSent = false;

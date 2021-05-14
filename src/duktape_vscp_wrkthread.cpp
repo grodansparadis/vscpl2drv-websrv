@@ -78,7 +78,7 @@ actionJavascriptThread(void *pData)
         return NULL;
     }
 
-    CWebObj *pObj = (CWebObj *)pActionObj->pParent;;
+    CWebObj *pObj = (CWebObj *)pActionObj->pParent;
     if (NULL == pObj) return NULL; 
 
     pActionObj->m_start = vscpdatetime::Now(); // Mark start time
@@ -110,15 +110,6 @@ actionJavascriptThread(void *pData)
 
     duk_push_c_function(ctx, js_vscp_sleep, 1);
     duk_put_global_string(ctx, "vscp_sleep");
-
-    duk_push_c_function(ctx, js_vscp_readVariable, 1);
-    duk_put_global_string(ctx, "vscp_readVariable");
-
-    duk_push_c_function(ctx, js_vscp_writeVariable, 1);
-    duk_put_global_string(ctx, "vscp_writeVariable");
-
-    duk_push_c_function(ctx, js_vscp_deleteVariable, 1);
-    duk_put_global_string(ctx, "vscp_deleteVariable");
 
     duk_push_c_function(ctx, js_vscp_sendEvent, 1);
     duk_put_global_string(ctx, "vscp_sendEvent");
@@ -153,16 +144,9 @@ actionJavascriptThread(void *pData)
     duk_push_c_function(ctx, js_get_MeasurementSubZone, 1);
     duk_put_global_string(ctx, "vscp_getMeasurementSubZone");
 
-    // Save the DM feed event for easy access
-    // std::string strEvent;
-    // vscp_convertEventExToJSON(strEvent, &pobj->m_feedEvent );
-    // duk_push_string(ctx, (const char *)strEvent.c_str());
-    // duk_json_decode(ctx, -1);
-    // duk_put_global_string(ctx, "vscp_feedevent");
-
     // Save client object as a global pointer
-    duk_push_pointer(ctx, (void *)pActionObj->m_pClientItem);
-    duk_put_global_string(ctx, "vscp_controlobject");
+    duk_push_pointer(ctx, (void *)pObj);
+    duk_put_global_string(ctx, "vscp_webobj");
 
     // Create VSCP client
     pActionObj->m_pClientItem = new CClientItem();

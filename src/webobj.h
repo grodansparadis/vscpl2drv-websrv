@@ -120,6 +120,17 @@ public:
 
   /*!
       Put event on receive queue and signal
+      that a new event is available.
+      Note that the ownership of the event is transfered to the system
+      and should not be deleted by the caller.
+
+      @param ev Event to send
+      @return true on success, false on failure
+  */
+  bool eventToReceiveQueue(vscpEvent *pev);
+
+  /*!
+      Put event ex on receive queue and signal
       that a new event is available
 
       @param ex Event to send
@@ -135,8 +146,8 @@ public:
   /*!
     Send event to MQTT broker
   */
-  bool sendEvent(vscpEventEx* pex);
-  bool sendEvent(vscpEvent* pev);
+  // bool sendEvent(vscpEventEx* pex);
+  // bool sendEvent(vscpEvent* pev);
 
 public:
   /// Parsed Config file

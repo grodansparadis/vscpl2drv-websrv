@@ -446,12 +446,18 @@ websock_sendevent(struct mg_connection* conn,
     return false;
   }
 
-  return pSession->m_pParent->sendEvent(pex);
+  return pSession->m_pParent->eventExToReceiveQueue(*pex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // websocket_post_incomingEvent
 //
+
+/*
+  This method is not relevant anymore as events sent by a websocket client
+  is noe sent directly to the MQTT broker. The broker subscribe topic determines 
+  for a client determines if the websocket clients will receive the event
+*/
 
 void
 websock_post_incomingEvents(const websock_session* pSession)
@@ -500,27 +506,27 @@ websock_post_incomingEvents(const websock_session* pSession)
             continue;
           }
 
-          std::string str;
-          if (vscp_convertEventToString(str, pEvent)) {
-            spdlog::get("logger")->debug("[ws] Received ws event {}", str);
+          if (WS_TYPE_1 == pSession->m_wstypes) {
+            std::string str;
+            if (vscp_convertEventToString(str, pEvent)) {
+              spdlog::get("logger")->debug("[ws] Received ws event {}", str);
 
-            // Write it out
-            if (WS_TYPE_1 == pSession->m_wstypes) {
+              // Write it out            
               str = ("E;") + str;
               mg_websocket_write(pSession->m_conn,
                                  MG_WEBSOCKET_OPCODE_TEXT,
                                  (const char*)str.c_str(),
                                  str.length());
             }
-            else if (WS_TYPE_2 == pSession->m_wstypes) {
-              std::string strEvent;
-              vscp_convertEventToJSON(strEvent, pEvent);
-              std::string str = vscp_str_format(WS2_EVENT, strEvent.c_str());
-              mg_websocket_write(pSession->m_conn,
+          }
+          else if (WS_TYPE_2 == pSession->m_wstypes) {
+            std::string strEvent;
+            vscp_convertEventToJSON(strEvent, pEvent);
+            std::string str = vscp_str_format(WS2_EVENT, strEvent.c_str());
+            mg_websocket_write(pSession->m_conn,
                                  MG_WEBSOCKET_OPCODE_TEXT,
                                  (const char*)str.c_str(),
                                  str.length());
-            }
           }
         } // filter
 

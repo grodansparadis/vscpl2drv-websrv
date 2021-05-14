@@ -224,31 +224,14 @@ CWebObj::~CWebObj()
   spdlog::shutdown();
 }
 
-//////////////////////////////////////////////////////////////////////
-// sendEvent
-//
 
-bool
-CWebObj::sendEvent(vscpEventEx* pex)
-{
-  return true;
-}
-
-//////////////////////////////////////////////////////////////////////
-// sendEvent
-//
-
-bool
-CWebObj::sendEvent(vscpEvent* pev)
-{
-  return true;
-}
 
 // ----------------------------------------------------------------------------
 
+
+
 //////////////////////////////////////////////////////////////////////
 // open
-//
 //
 
 bool
@@ -305,7 +288,113 @@ CWebObj::close(void)
   sleep(1);       // Give the thread some time to terminate
 }
 
+
+
 // ----------------------------------------------------------------------------
+
+
+
+//////////////////////////////////////////////////////////////////////
+// sendEvent
+//
+
+// bool
+// CWebObj::sendEvent(vscpEventEx* pex)
+// {
+//   return true;
+// }
+
+//////////////////////////////////////////////////////////////////////
+// sendEvent
+//
+
+// bool
+// CWebObj::sendEvent(vscpEvent* pev)
+// {
+
+//   return true;
+// }
+
+///////////////////////////////////////////////////////////////////////////////
+// eventToReceiveQueue
+//
+
+bool
+CWebObj::eventToReceiveQueue(vscpEvent *pev)
+{
+  if (nullptr != pev) {
+    if (vscp_doLevel2Filter(pev, &m_filterIn)) {
+      pthread_mutex_lock(&m_mutexReceiveQueue);
+      m_receiveList.push_back(pev);
+      sem_post(&m_semReceiveQueue);
+      pthread_mutex_unlock(&m_mutexReceiveQueue);
+    }
+    else {
+      spdlog::get("logger")->debug("Receive event filtered away.");
+      vscp_deleteEvent_v2(&pev);
+    }
+  }
+  else {
+    spdlog::get("logger")->error("Event is null pointer. Skipped");
+  }
+
+  return true;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// eventExToReceiveQueue
+//
+
+bool
+CWebObj::eventExToReceiveQueue(vscpEventEx& ex)
+{
+  vscpEvent* pev = new vscpEvent();
+  if (!vscp_convertEventExToEvent(pev, &ex)) {
+    spdlog::get("logger")->error("Failed to convert event from ex to ev.");
+    vscp_deleteEvent(pev);
+    return false;
+  }
+  if (NULL != pev) {
+    if (vscp_doLevel2Filter(pev, &m_filterIn)) {
+      pthread_mutex_lock(&m_mutexReceiveQueue);
+      m_receiveList.push_back(pev);
+      sem_post(&m_semReceiveQueue);
+      pthread_mutex_unlock(&m_mutexReceiveQueue);
+    }
+    else {
+      spdlog::get("logger")->debug("Receive event filtered away.");
+      vscp_deleteEvent(pev);
+    }
+  }
+  else {
+    spdlog::get("logger")->error("Unable to allocate event storage.");
+  }
+
+  return true;
+}
+
+//////////////////////////////////////////////////////////////////////
+// addEvent2SendQueue
+//
+
+bool
+CWebObj::addEvent2SendQueue(const vscpEvent* pEvent)
+{
+  pthread_mutex_lock(&m_mutexSendQueue);
+  m_sendList.push_back((vscpEvent*)pEvent);
+  sem_post(&m_semSendQueue);
+  pthread_mutex_lock(&m_mutexSendQueue);
+  return true;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+
+
+
 
 /////////////////////////////////////////////////////////////////////////////
 // readEncryptionKey
@@ -2144,7 +2233,7 @@ CWebObj::doLoadConfig(void)
 //     m_guid.writeGUID(ex.GUID);
 
 //     switch (hlo.m_op) {
-
+//
 //         case HLO_OP_NOOP:
 //             // Send positive response
 //             sprintf(buf,
@@ -2321,49 +2410,7 @@ CWebObj::doLoadConfig(void)
 //     return true;
 // }
 
-///////////////////////////////////////////////////////////////////////////////
-// eventExToReceiveQueue
-//
 
-bool
-CWebObj::eventExToReceiveQueue(vscpEventEx& ex)
-{
-  vscpEvent* pev = new vscpEvent();
-  if (!vscp_convertEventExToEvent(pev, &ex)) {
-    spdlog::get("logger")->error("Failed to convert event from ex to ev.");
-    vscp_deleteEvent(pev);
-    return false;
-  }
-  if (NULL != pev) {
-    if (vscp_doLevel2Filter(pev, &m_filterIn)) {
-      pthread_mutex_lock(&m_mutexReceiveQueue);
-      m_receiveList.push_back(pev);
-      sem_post(&m_semReceiveQueue);
-      pthread_mutex_unlock(&m_mutexReceiveQueue);
-    }
-    else {
-      vscp_deleteEvent(pev);
-    }
-  }
-  else {
-    spdlog::get("logger")->error("Unable to allocate event storage.");
-  }
-  return true;
-}
-
-//////////////////////////////////////////////////////////////////////
-// addEvent2SendQueue
-//
-
-bool
-CWebObj::addEvent2SendQueue(const vscpEvent* pEvent)
-{
-  pthread_mutex_lock(&m_mutexSendQueue);
-  m_sendList.push_back((vscpEvent*)pEvent);
-  sem_post(&m_semSendQueue);
-  pthread_mutex_lock(&m_mutexSendQueue);
-  return true;
-}
 
 //////////////////////////////////////////////////////////////////////
 // Send worker thread
@@ -2372,265 +2419,42 @@ CWebObj::addEvent2SendQueue(const vscpEvent* pEvent)
 void*
 workerThreadSend(void* pData)
 {
-  bool bRemoteConnectionLost = false;
+  spdlog::get("logger")->debug("Starting worker thread");
 
   CWebObj* pObj = (CWebObj*)pData;
   if (NULL == pObj) {
     return NULL;
   }
 
-retry_send_connect:
+  // Work until the end
+  while (!pObj->m_bQuit) {
 
-  // // Open remote interface
-  // if (VSCP_ERROR_SUCCESS !=
-  //     pObj->m_srvRemoteSend.doCmdOpen(pObj->m_hostRemote,
-  //                                 pObj->m_portRemote,
-  //                                 pObj->m_usernameRemote,
-  //                                 pObj->m_passwordRemote)) {
-  //     spdlog::get("logger")->error(
-  //            "{} {} ",
-  //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //            (const char*)"Error while opening remote VSCP TCP/IP "
-  //                         "interface. Terminating!");
+    if ((-1 == vscp_sem_wait(&pObj->m_semSendQueue, 500)) &&
+      errno == ETIMEDOUT) {
+      continue;
+    }
 
-  //     // Give the server some time to become active
-  //     for (int loopcnt = 0; loopcnt < VSCP_TCPIPLINK_DEFAULT_RECONNECT_TIME;
-  //          loopcnt++) {
-  //         sleep(1);
-  //         if (pObj->m_bQuit)
-  //             return NULL;
-  //     }
+    // Check if there is event(s) to send
+    if (pObj->m_sendList.size()) {
 
-  //     goto retry_send_connect;
-  // }
+      // Yes there are data to send
+      pthread_mutex_lock(&pObj->m_mutexSendQueue);
+      vscpEvent* pEvent = pObj->m_sendList.front();
+  
+      pObj->m_sendList.pop_front();
+      pthread_mutex_unlock(&pObj->m_mutexSendQueue);
 
-  // spdlog::get("logger")->error(
-  //        "{} {} ",
-  //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //        (const char*)"Connect to remote VSCP TCP/IP interface [SEND].");
+      // Yes there is data to send
+      // Send it out to the remote server
 
-  // // Find the channel id
-  // pObj->m_srvRemoteSend.doCmdGetChannelID(&pObj->txChannelID);
+      //pObj->m_srvRemoteSend.doCmdSend(pEvent);
+      vscp_deleteEvent_v2(&pEvent);
+    }
 
-  // while (!pObj->m_bQuit) {
+  }
 
-  //     // Make sure the remote connection is up
-  //     if (!pObj->m_srvRemoteSend.isConnected()) {
-
-  //         if (!bRemoteConnectionLost) {
-  //             bRemoteConnectionLost = true;
-  //             pObj->m_srvRemoteSend.doCmdClose();
-  //             spdlog::get("logger")->error(
-  //                    "{} {} ",
-  //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //                    (const char*)"Lost connection to remote host [SEND].");
-  //         }
-
-  //         // Wait before we try to connect again
-  //         sleep(VSCP_TCPIPLINK_DEFAULT_RECONNECT_TIME);
-
-  //         if (VSCP_ERROR_SUCCESS !=
-  //             pObj->m_srvRemoteSend.doCmdOpen(pObj->m_hostRemote,
-  //                                         pObj->m_portRemote,
-  //                                         pObj->m_usernameRemote,
-  //                                         pObj->m_passwordRemote)) {
-  //             spdlog::get("logger")->error(
-  //                    "{} {} ",
-  //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //                    (const char*)"Reconnected to remote host [SEND].");
-
-  //             // Find the channel id
-  //             pObj->m_srvRemoteSend.doCmdGetChannelID(&pObj->txChannelID);
-
-  //             bRemoteConnectionLost = false;
-  //         }
-
-  //         continue;
-  //     }
-
-  //     if ((-1 == vscp_sem_wait(&pObj->m_semSendQueue, 500)) &&
-  //         errno == ETIMEDOUT) {
-  //         continue;
-  //     }
-
-  //     // Check if there is event(s) to send
-  //     if (pObj->m_sendList.size()) {
-
-  //         // Yes there are data to send
-  //         pthread_mutex_lock(&pObj->m_mutexSendQueue);
-  //         vscpEvent* pEvent = pObj->m_sendList.front();
-  //         // Check if event should be filtered away
-  //         if (!vscp_doLevel2Filter(pEvent, &pObj->m_txfilter)) {
-  //             pthread_mutex_unlock(&pObj->m_mutexSendQueue);
-  //             continue;
-  //         }
-  //         pObj->m_sendList.pop_front();
-  //         pthread_mutex_unlock(&pObj->m_mutexSendQueue);
-
-  //         // Only HLO object event is of interst to us
-  //         if ((VSCP_CLASS2_PROTOCOL == pEvent->vscp_class) &&
-  //             (VSCP2_TYPE_HLO_COMMAND == pEvent->vscp_type)) {
-  //             pObj->handleHLO(pEvent);
-  //         }
-
-  //         if (NULL == pEvent)
-  //             continue;
-
-  //         // Yes there are data to send
-  //         // Send it out to the remote server
-
-  //         pObj->m_srvRemoteSend.doCmdSend(pEvent);
-  //         vscp_deleteEvent_v2(&pEvent);
-  //     }
-  // }
-
-  // // Close the channel
-  // pObj->m_srvRemoteSend.doCmdClose();
-
-  // spdlog::get("logger")->error(
-  //        "{} {} ",
-  //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //        (const char*)"Disconnect from remote VSCP TCP/IP interface
-  //        [SEND].");
+  spdlog::get("logger")->debug("Ending worker thread");
 
   return NULL;
 }
 
-//////////////////////////////////////////////////////////////////////
-//                Workerthread Receive - CWrkReceiveTread
-//////////////////////////////////////////////////////////////////////
-
-void*
-workerThreadReceive(void* pData)
-{
-  bool bRemoteConnectionLost             = false;
-  __attribute__((unused)) bool bActivity = false;
-
-  CWebObj* pObj = (CWebObj*)pData;
-  if (NULL == pObj)
-    return NULL;
-
-retry_receive_connect:
-
-  // if (pObj->m_bDebug) {
-  //     printf("Open receive channel host = %s port = %d\n",
-  //             pObj->m_hostRemote.c_str(),
-  //             pObj->m_portRemote);
-  // }
-
-  // // Open remote interface
-  // if (VSCP_ERROR_SUCCESS !=
-  //     pObj->m_srvRemoteReceive.doCmdOpen(pObj->m_hostRemote,
-  //                                         pObj->m_portRemote,
-  //                                         pObj->m_usernameRemote,
-  //                                         pObj->m_passwordRemote)) {
-  //     spdlog::get("logger")->error(
-  //            "{} {} ",
-  //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //            (const char*)"Error while opening remote VSCP TCP/IP "
-  //                         "interface. Terminating!");
-
-  //     // Give the server some time to become active
-  //     for (int loopcnt = 0; loopcnt < VSCP_TCPIPLINK_DEFAULT_RECONNECT_TIME;
-  //          loopcnt++) {
-  //         sleep(1);
-  //         if (pObj->m_bQuit)
-  //             return NULL;
-  //     }
-
-  //     goto retry_receive_connect;
-  // }
-
-  // spdlog::get("logger")->error(
-  //        "{} {} ",
-  //        VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //        (const char*)"Connect to remote VSCP TCP/IP interface [RECEIVE].");
-
-  // // Set receive filter
-  // if (VSCP_ERROR_SUCCESS !=
-  //     pObj->m_srvRemoteReceive.doCmdFilter(&pObj->m_rxfilter)) {
-  //     spdlog::get("logger")->error(
-  //            "{} {} ",
-  //            VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //            (const char*)"Failed to set receiving filter.");
-  // }
-
-  // // Enter the receive loop
-  // pObj->m_srvRemoteReceive.doCmdEnterReceiveLoop();
-
-  // __attribute__((unused)) vscpEventEx eventEx;
-  // while (!pObj->m_bQuit) {
-
-  //     // Make sure the remote connection is up
-  //     if (!pObj->m_srvRemoteReceive.isConnected() ||
-  //         ((vscp_getMsTimeStamp() -
-  //         pObj->m_srvRemoteReceive.getlastResponseTime()) >
-  //          (VSCP_TCPIPLINK_DEFAULT_RECONNECT_TIME * 1000))) {
-
-  //         if (!bRemoteConnectionLost) {
-
-  //             bRemoteConnectionLost = true;
-  //             pObj->m_srvRemoteReceive.doCmdClose();
-  //             spdlog::get("logger")->error( "{} {} ",
-  //             VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //                         (const char*)"Lost connection to remote host
-  //                         [Receive].");
-  //         }
-
-  //         // Wait before we try to connect again
-  //         sleep(VSCP_TCPIPLINK_DEFAULT_RECONNECT_TIME);
-
-  //         if (VSCP_ERROR_SUCCESS !=
-  //             pObj->m_srvRemoteReceive.doCmdOpen(pObj->m_hostRemote,
-  //                                                 pObj->m_portRemote,
-  //                                                 pObj->m_usernameRemote,
-  //                                                 pObj->m_passwordRemote)) {
-  //             spdlog::get("logger")->error(
-  //                    "{} {} ",
-  //                    VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //                    (const char*)"Reconnected to remote host [Receive].");
-  //             bRemoteConnectionLost = false;
-  //         }
-
-  //         // Enter the receive loop
-  //         pObj->m_srvRemoteReceive.doCmdEnterReceiveLoop();
-
-  //         continue;
-  //     }
-
-  //     // Check if remote server has something to send to us
-  //     vscpEvent* pEvent = new vscpEvent;
-  //     if (NULL != pEvent) {
-
-  //         pEvent->sizeData = 0;
-  //         pEvent->pdata = NULL;
-
-  //         if (CANAL_ERROR_SUCCESS ==
-  //             pObj->m_srvRemoteReceive.doCmdBlockingReceive(pEvent)) {
-
-  //             // Filter is handled at server side. We check so we don't
-  //             // receive things we send ourself.
-  //             if (pObj->txChannelID != pEvent->obid) {
-  //                 pthread_mutex_lock(&pObj->m_mutexReceiveQueue);
-  //                 pObj->m_receiveList.push_back(pEvent);
-  //                 sem_post(&pObj->m_semReceiveQueue);
-  //                 pthread_mutex_unlock(&pObj->m_mutexReceiveQueue);
-  //             } else {
-  //                 vscp_deleteEvent(pEvent);
-  //             }
-
-  //         } else {
-  //             vscp_deleteEvent(pEvent);
-  //         }
-  //     }
-  // }
-
-  // // Close the channel
-  // pObj->m_srvRemoteReceive.doCmdClose();
-
-  // spdlog::get("logger")->error("{} {} ",
-  //   VSCP_TCPIPLINK_SYSLOG_DRIVER_ID,
-  //   (const char*)"Disconnect from remote VSCP TCP/IP interface [RECEIVE].");
-
-  return NULL;
-}

@@ -91,7 +91,7 @@
         "level2" : [
             {
                 "enable" : true,
-                "name" : "web-srv",
+                "name" : "l2drv-web-srv",
                 "path-driver" : "/home/akhe/development/VSCP/vscpl2drv-websrv/build/libvscpl2drv-websrv.so",
                 "path-config" : "/home/akhe/development/VSCP/vscpl2drv-websrv/debug/linux/vscpl2drv-websrv.conf",
                 "guid" : "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:99:00:00:00:00",
@@ -115,7 +115,7 @@
                     "keyfile" : "",
                     "pwkeyfile" : "",
                     "subscribe" : [
-                        "vscp/#"
+                        "vscp2drv-websrv"
                     ],
                     "publish" : [
                         "vscp2drv-websrv"

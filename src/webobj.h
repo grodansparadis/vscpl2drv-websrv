@@ -66,7 +66,7 @@ class CWrkSendTread;
 class CWrkReceiveTread;
 class VscpRemoteTcpIf;
 class CHLO;
-class websock_session;
+class CWebsockSession;
 
 /*!
   CWebObj Websocket object
@@ -83,7 +83,7 @@ public:
     Open
     @return True on success.
    */
-  bool open(std::string& path, const cguid& guid);
+  bool open(std::string &path, const cguid &guid);
 
   /*!
     Flush and close the log file
@@ -93,12 +93,12 @@ public:
   /*!
     Parse HLO object
   */
-  bool parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo);
+  bool parseHLO(uint16_t size, uint8_t *inbuf, CHLO *phlo);
 
   /*!
     Handle high level object
   */
-  bool handleHLO(vscpEvent* pEvent);
+  bool handleHLO(vscpEvent *pEvent);
 
   /*!
     Read in encryption key from disk
@@ -106,7 +106,7 @@ public:
     hexadecimal string form (do separator between hex numbers "001122..eeff").
     @return true is returned on success, false otherwise.
   */
-  bool readEncryptionKey(const std::string& path);
+  bool readEncryptionKey(const std::string &path);
 
   /*!
     Load configuration if allowed to do so
@@ -116,7 +116,7 @@ public:
   /*!
     Save configuration if allowed to do so
   */
-  bool doSaveConfig(const std::string& path);
+  bool doSaveConfig(const std::string &path);
 
   /*!
       Put event on receive queue and signal
@@ -136,12 +136,12 @@ public:
       @param ex Event to send
       @return true on success, false on failure
   */
-  bool eventExToReceiveQueue(vscpEventEx& ex);
+  bool eventExToReceiveQueue(vscpEventEx &ex);
 
   /*!
       Add event to send queue
   */
-  bool addEvent2SendQueue(const vscpEvent* pEvent);
+  bool addEvent2SendQueue(const vscpEvent *pEvent);
 
   /*!
     Send event to MQTT broker
@@ -166,10 +166,9 @@ public:
   cguid m_guid;
 
   // The default random encryption key
-  uint8_t m_vscp_key[32] = { 0x2d, 0xbb, 0x07, 0x9a, 0x38, 0x98, 0x5a, 0xf0,
-                             0x0e, 0xbe, 0xef, 0xe2, 0x2f, 0x9f, 0xfa, 0x0e,
-                             0x7f, 0x72, 0xdf, 0x06, 0xeb, 0xe4, 0x45, 0x63,
-                             0xed, 0xf4, 0xa1, 0x07, 0x3c, 0xab, 0xc7, 0xd4 };
+  uint8_t m_vscp_key[32] = { 0x2d, 0xbb, 0x07, 0x9a, 0x38, 0x98, 0x5a, 0xf0, 0x0e, 0xbe, 0xef,
+                             0xe2, 0x2f, 0x9f, 0xfa, 0x0e, 0x7f, 0x72, 0xdf, 0x06, 0xeb, 0xe4,
+                             0x45, 0x63, 0xed, 0xf4, 0xa1, 0x07, 0x3c, 0xab, 0xc7, 0xd4 };
 
   /////////////////////////////////////////////////////////
   //                      Logging
@@ -183,8 +182,8 @@ public:
   spdlog::level::level_enum m_fileLogLevel; // log level
   std::string m_fileLogPattern;             // log file pattern
   std::string m_path_to_log_file;           // Path to logfile
-  uint32_t m_max_log_size;  // Max size for logfile before rotating occures
-  uint16_t m_max_log_files; // Max log files to keep
+  uint32_t m_max_log_size;                  // Max size for logfile before rotating occures
+  uint16_t m_max_log_files;                 // Max log files to keep
 
   // ------------------------------------------------------------------------
 
@@ -209,7 +208,7 @@ public:
   //*****************************************************
 
   // Context for web server
-  struct mg_context* m_web_ctx;
+  struct mg_context *m_web_ctx;
 
   // Enable webserver
   bool m_bEnableWebServer;
@@ -287,7 +286,8 @@ public:
   pthread_mutex_t m_mutex_websrvSession;
 
   // Linked list of all active sessions. (websrv.h)
-  std::list<struct websrv_session*> m_web_sessions;
+  std::list<struct websrv_session *> m_web_sessions;
+
 
   //**************************************************************************
   //                              REST
@@ -297,10 +297,11 @@ public:
   pthread_mutex_t m_mutex_restSession;
 
   // Session structure for REST API
-  std::list<struct restsrv_session*> m_rest_sessions;
+  std::list<struct restsrv_session *> m_rest_sessions;
 
   // Enable REST API
   bool m_bEnableRestApi;
+
 
   //**************************************************************************
   //                              WEBSOCKETS
@@ -317,7 +318,8 @@ public:
   pthread_mutex_t m_mutex_websocketSession;
 
   // List of active websocket sessions
-  std::list<websock_session*> m_websocketSessions;
+  std::list<CWebsockSession *> m_websocketSessions;
+
 
   //**************************************************************************
   //                                USERS
@@ -332,6 +334,7 @@ public:
   // Mutex for users
   pthread_mutex_t m_mutex_UserList;
 
+
   //**************************************************************************
   //                                CLIENTS
   //**************************************************************************
@@ -342,32 +345,33 @@ public:
   // Mutex for client queue
   pthread_mutex_t m_mutex_clientList;
 
+
   //**************************************************************************
   //                                SESSIONS
   //**************************************************************************
 
   // pthread_mutex_t m_mutex_websocketSession;
-  // std::list<websock_session*> m_websocketSessions;
+  //std::list<CWebsockSession*> m_websocketSessions;
 
   // -------------------------------------------------------------------------
 
   // Queue
-  std::list<vscpEvent*> m_sendList;
-  std::list<vscpEvent*> m_receiveList;
+  //std::list<vscpEvent *> m_sendList;    // Data out to client
+  std::list<vscpEvent *> m_receiveList; // Data from client
 
   /*!
       Event object to indicate that there is an event in the output queue
    */
-  sem_t m_semSendQueue;
-  sem_t m_semReceiveQueue;
+  sem_t m_semSendQueue;    // Semaphore for Data out to client
+  sem_t m_semReceiveQueue; // Semaphore for data in from client
 
   // Mutex to protect the output queue
-  pthread_mutex_t m_mutexSendQueue;
-  pthread_mutex_t m_mutexReceiveQueue;
+  //pthread_mutex_t m_mutexSendQueue;    // Protect sendqueue (data to client)
+  pthread_mutex_t m_mutexReceiveQueue; // Protect receive queue (data from client)
 
   // Max queues
-  uint32_t m_maxItemsInClientSendQueue;
-  uint32_t m_maxItemsInClientReceiveQueue;
+  //uint32_t m_maxItemsInClientSendQueue;    // Max events in queue from client
+  uint32_t m_maxItemsInClientReceiveQueue; // Max events in queue to send to clients
 };
 
 #endif // !defined(VSCPTCPIPLINK_H__6F5CD90E_ACF7_459A_9ACB_849A57595639__INCLUDED_)

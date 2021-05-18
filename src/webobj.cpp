@@ -54,6 +54,7 @@
 #include <vscpdatetime.h>
 #include <vscphelper.h>
 #include <webdefs.h>
+#include <websocketsrv.h>
 #include <websrv.h>
 
 #include "webobj.h"
@@ -77,10 +78,10 @@ using json = nlohmann::json;
 using namespace kainjow::mustache;
 
 // Forward declaration
-void*
-workerThreadReceive(void* pData);
-void*
-workerThreadSend(void* pData);
+void *
+workerThreadReceive(void *pData);
+void *
+workerThreadSend(void *pData);
 
 //////////////////////////////////////////////////////////////////////
 // CWebObj
@@ -99,7 +100,7 @@ CWebObj::CWebObj()
   sem_init(&m_semSendQueue, 0, 0);
   sem_init(&m_semReceiveQueue, 0, 0);
 
-  pthread_mutex_init(&m_mutexSendQueue, NULL);
+  //pthread_mutex_init(&m_mutexSendQueue, NULL);
   pthread_mutex_init(&m_mutexReceiveQueue, NULL);
 
   // Init pool
@@ -186,20 +187,19 @@ CWebObj::CWebObj()
 
   std::string m_web_duktape_script_patterns = "**.ssjs$";
 
-  std::string m_web_lua_preload_file         = "";
-  std::string m_web_lua_script_patterns      = "**.lua$";
-  std::string m_web_lua_server_page_patterns = "**.lp$|**.lsp$";
-  std::string m_web_lua_websocket_patterns =
-    VSCPDB_CONFIG_DEFAULT_WEB_LUA_WEBSOCKET_PATTERN;
+  std::string m_web_lua_preload_file             = "";
+  std::string m_web_lua_script_patterns          = "**.lua$";
+  std::string m_web_lua_server_page_patterns     = "**.lp$|**.lsp$";
+  std::string m_web_lua_websocket_patterns       = VSCPDB_CONFIG_DEFAULT_WEB_LUA_WEBSOCKET_PATTERN;
   std::string m_web_lua_background_script        = "";
   std::string m_web_lua_background_script_params = "";
 
   m_web_run_as_user    = "";
   m_web_case_sensitive = false;
 
-  m_bEnableWebsockets       = true;
-  m_websocket_document_root = VSCPDB_CONFIG_DEFAULT_WEBSOCKET_DOCUMENT_ROOT;
-  m_websocket_timeout_ms    = 10000;
+  m_bEnableWebsockets              = true;
+  m_websocket_document_root        = VSCPDB_CONFIG_DEFAULT_WEBSOCKET_DOCUMENT_ROOT;
+  m_websocket_timeout_ms           = 10000;
   bool bEnable_websocket_ping_pong = true;
 
   m_bEnableRestApi = true;
@@ -216,7 +216,7 @@ CWebObj::~CWebObj()
   sem_destroy(&m_semSendQueue);
   sem_destroy(&m_semReceiveQueue);
 
-  pthread_mutex_destroy(&m_mutexSendQueue);
+  //pthread_mutex_destroy(&m_mutexSendQueue);
   pthread_mutex_destroy(&m_mutexReceiveQueue);
 
   // Shutdown logger in a nice way
@@ -224,18 +224,14 @@ CWebObj::~CWebObj()
   spdlog::shutdown();
 }
 
-
-
 // ----------------------------------------------------------------------------
-
-
 
 //////////////////////////////////////////////////////////////////////
 // open
 //
 
 bool
-CWebObj::open(std::string& path, const cguid& guid)
+CWebObj::open(std::string &path, const cguid &guid)
 {
   // Set GUID
   m_guid = guid;
@@ -245,8 +241,7 @@ CWebObj::open(std::string& path, const cguid& guid)
 
   // Read configuration file
   if (!doLoadConfig()) {
-    spdlog::get("logger")->critical("Failed to load configuration file [{}]",
-                                    path);
+    spdlog::get("logger")->critical("Failed to load configuration file [{}]", path);
     return false;
   }
 
@@ -281,39 +276,16 @@ void
 CWebObj::close(void)
 {
   // Do nothing if already terminated
-  if (m_bQuit)
+  if (m_bQuit) {
     return;
+  }
 
   m_bQuit = true; // terminate the thread
   sleep(1);       // Give the thread some time to terminate
 }
 
-
-
 // ----------------------------------------------------------------------------
 
-
-
-//////////////////////////////////////////////////////////////////////
-// sendEvent
-//
-
-// bool
-// CWebObj::sendEvent(vscpEventEx* pex)
-// {
-//   return true;
-// }
-
-//////////////////////////////////////////////////////////////////////
-// sendEvent
-//
-
-// bool
-// CWebObj::sendEvent(vscpEvent* pev)
-// {
-
-//   return true;
-// }
 
 ///////////////////////////////////////////////////////////////////////////////
 // eventToReceiveQueue
@@ -341,15 +313,14 @@ CWebObj::eventToReceiveQueue(vscpEvent *pev)
   return true;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // eventExToReceiveQueue
 //
 
 bool
-CWebObj::eventExToReceiveQueue(vscpEventEx& ex)
+CWebObj::eventExToReceiveQueue(vscpEventEx &ex)
 {
-  vscpEvent* pev = new vscpEvent();
+  vscpEvent *pev = new vscpEvent();
   if (!vscp_convertEventExToEvent(pev, &ex)) {
     spdlog::get("logger")->error("Failed to convert event from ex to ev.");
     vscp_deleteEvent(pev);
@@ -379,29 +350,29 @@ CWebObj::eventExToReceiveQueue(vscpEventEx& ex)
 //
 
 bool
-CWebObj::addEvent2SendQueue(const vscpEvent* pEvent)
+CWebObj::addEvent2SendQueue(const vscpEvent *pEvent)
 {
-  pthread_mutex_lock(&m_mutexSendQueue);
-  m_sendList.push_back((vscpEvent*)pEvent);
-  sem_post(&m_semSendQueue);
-  pthread_mutex_lock(&m_mutexSendQueue);
+  //pthread_mutex_lock(&m_mutexSendQueue);
+  // m_sendList.push_back((vscpEvent*)pEvent);
+  // sem_post(&m_semSendQueue);
+  // pthread_mutex_lock(&m_mutexSendQueue);
+
+  pthread_mutex_lock(&m_mutex_clientList);
+  m_clientList.sendEventAllClients(pEvent);
+  pthread_mutex_unlock(&m_mutex_clientList);
+  sem_post(&m_semSendQueue); // Signal that event is available
+
   return true;
 }
 
-
-
-
 // ----------------------------------------------------------------------------
-
-
-
 
 /////////////////////////////////////////////////////////////////////////////
 // readEncryptionKey
 //
 
 bool
-CWebObj::readEncryptionKey(const std::string& path)
+CWebObj::readEncryptionKey(const std::string &path)
 {
   bool rv = false; // Be negative today
 
@@ -416,8 +387,7 @@ CWebObj::readEncryptionKey(const std::string& path)
     rv = vscp_hexStr2ByteArray(m_vscp_key, 32, vscpkey.c_str());
   }
   catch (...) {
-    spdlog::get("logger")->error("Failed to read encryption key file [{}]",
-                                 m_path.c_str());
+    spdlog::get("logger")->error("Failed to read encryption key file [{}]", m_path.c_str());
   }
 
   return rv;
@@ -434,12 +404,8 @@ CWebObj::doLoadConfig(void)
     std::ifstream in(m_path, std::ifstream::in);
     in >> m_j_config;
   }
-  catch (json::parse_error& e) {
-    spdlog::critical(
-      "Failed to load/parse JSON configuration. message: {}, id: {}, pos: {} ",
-      e.what(),
-      e.id,
-      e.byte);
+  catch (json::parse_error &e) {
+    spdlog::critical("Failed to load/parse JSON configuration. message: {}, id: {}, pos: {} ", e.what(), e.id, e.byte);
     return false;
   }
   catch (...) {
@@ -461,7 +427,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_bConsoleLogEnable = j["console-enable"].get<bool>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'console-enable' Error='{}'", ex.what());
       }
       catch (...) {
@@ -469,8 +435,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::debug(
-        "Failed to read LOGGING 'console-enable' Defaults will be used.");
+      spdlog::debug("Failed to read LOGGING 'console-enable' Defaults will be used.");
     }
 
     // Logging: console-log-level
@@ -479,7 +444,7 @@ CWebObj::doLoadConfig(void)
       try {
         str = j["console-level"].get<std::string>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'console-level' Error='{}'", ex.what());
       }
       catch (...) {
@@ -514,8 +479,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::error(
-        "Failed to read LOGGING 'console-level' Defaults will be used.");
+      spdlog::error("Failed to read LOGGING 'console-level' Defaults will be used.");
     }
 
     // Logging: console-log-pattern
@@ -523,7 +487,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_consoleLogPattern = j["console-pattern"].get<std::string>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'console-pattern' Error='{}'", ex.what());
       }
       catch (...) {
@@ -531,8 +495,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::debug(
-        "Failed to read LOGGING 'console-pattern' Defaults will be used.");
+      spdlog::debug("Failed to read LOGGING 'console-pattern' Defaults will be used.");
     }
 
     // * * *  FILE  * * *
@@ -542,7 +505,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_bFileLogEnable = j["file-enable"].get<bool>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'file-enable' Error='{}'", ex.what());
       }
       catch (...) {
@@ -550,8 +513,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::debug(
-        "Failed to read LOGGING 'file-enable' Defaults will be used.");
+      spdlog::debug("Failed to read LOGGING 'file-enable' Defaults will be used.");
     }
 
     // Logging: file-log-level
@@ -560,7 +522,7 @@ CWebObj::doLoadConfig(void)
       try {
         str = j["file-level"].get<std::string>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'file-level' Error='{}'", ex.what());
       }
       catch (...) {
@@ -595,8 +557,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::error(
-        "Failed to read LOGGING 'file-level' Defaults will be used.");
+      spdlog::error("Failed to read LOGGING 'file-level' Defaults will be used.");
     }
 
     // Logging: file-log-pattern
@@ -604,7 +565,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_fileLogPattern = j["file-pattern"].get<std::string>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'file-pattern' Error='{}'", ex.what());
       }
       catch (...) {
@@ -612,8 +573,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::debug(
-        "Failed to read LOGGING 'file-pattern' Defaults will be used.");
+      spdlog::debug("Failed to read LOGGING 'file-pattern' Defaults will be used.");
     }
 
     // Logging: file-path
@@ -621,7 +581,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_path_to_log_file = j["file-path"].get<std::string>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'file-path' Error='{}'", ex.what());
       }
       catch (...) {
@@ -629,8 +589,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::error(
-        " Failed to read LOGGING 'file-path' Defaults will be used.");
+      spdlog::error(" Failed to read LOGGING 'file-path' Defaults will be used.");
     }
 
     // Logging: file-max-size
@@ -638,7 +597,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_max_log_size = j["file-max-size"].get<uint32_t>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'file-max-size' Error='{}'", ex.what());
       }
       catch (...) {
@@ -646,8 +605,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::error(
-        "Failed to read LOGGING 'file-max-size' Defaults will be used.");
+      spdlog::error("Failed to read LOGGING 'file-max-size' Defaults will be used.");
     }
 
     // Logging: file-max-files
@@ -655,7 +613,7 @@ CWebObj::doLoadConfig(void)
       try {
         m_max_log_files = j["file-max-files"].get<uint16_t>();
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error("Failed to read 'file-max-files' Error='{}'", ex.what());
       }
       catch (...) {
@@ -663,8 +621,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::error(
-        "Failed to read LOGGING 'file-max-files' Defaults will be used.");
+      spdlog::error("Failed to read LOGGING 'file-max-files' Defaults will be used.");
     }
 
   } // Logging
@@ -691,10 +648,7 @@ CWebObj::doLoadConfig(void)
   // std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log_filename",
   // 1024*1024, 5, false);
   auto rotating_file_sink =
-    std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-      m_path_to_log_file.c_str(),
-      m_max_log_size,
-      m_max_log_files);
+    std::make_shared<spdlog::sinks::rotating_file_sink_mt>(m_path_to_log_file.c_str(), m_max_log_size, m_max_log_files);
 
   if (m_bFileLogEnable) {
     rotating_file_sink->set_level(m_fileLogLevel);
@@ -706,12 +660,11 @@ CWebObj::doLoadConfig(void)
   }
 
   std::vector<spdlog::sink_ptr> sinks{ console_sink, rotating_file_sink };
-  auto logger = std::make_shared<spdlog::async_logger>(
-    "logger",
-    sinks.begin(),
-    sinks.end(),
-    spdlog::thread_pool(),
-    spdlog::async_overflow_policy::block);
+  auto logger = std::make_shared<spdlog::async_logger>("logger",
+                                                       sinks.begin(),
+                                                       sinks.end(),
+                                                       spdlog::thread_pool(),
+                                                       spdlog::async_overflow_policy::block);
   // The separate sub loggers will handle trace levels
   logger->set_level(spdlog::level::trace);
   spdlog::register_logger(logger);
@@ -724,7 +677,7 @@ CWebObj::doLoadConfig(void)
       m_bWriteEnable = m_j_config["write"].get<bool>();
       spdlog::debug("bWriteEnable set to {}", m_bWriteEnable);
     }
-    catch (const std::exception& ex) {
+    catch (const std::exception &ex) {
       spdlog::error("Failed to read 'write' Error='{}'", ex.what());
     }
     catch (...) {
@@ -744,13 +697,11 @@ CWebObj::doLoadConfig(void)
                    m_j_config["key-file"].get<std::string>());
     }
     else {
-      spdlog::debug("key-file {} read successfully",
-                    m_j_config["key-file"].get<std::string>());
+      spdlog::debug("key-file {} read successfully", m_j_config["key-file"].get<std::string>());
     }
   }
   else {
-    spdlog::warn(
-      "VSCP key file is not defined. Default key will be used. Dangerous!");
+    spdlog::warn("VSCP key file is not defined. Default key will be used. Dangerous!");
   }
 
   // Path to user database
@@ -758,13 +709,11 @@ CWebObj::doLoadConfig(void)
     try {
       m_pathUsers = m_j_config["path-users"].get<std::string>();
       if (!m_userList.loadUsersFromFile(m_pathUsers)) {
-        spdlog::critical(
-          "Failed to load users from file 'user-path'='{}'. Terminating!",
-          m_pathUsers);
+        spdlog::critical("Failed to load users from file 'user-path'='{}'. Terminating!", m_pathUsers);
         return false;
       }
     }
-    catch (const std::exception& ex) {
+    catch (const std::exception &ex) {
       spdlog::error("Failed to read 'path-users' Error='{}'", ex.what());
     }
     catch (...) {
@@ -786,7 +735,7 @@ CWebObj::doLoadConfig(void)
         std::string str = j["in-filter"].get<std::string>();
         vscp_readFilterFromString(&m_filterIn, str.c_str());
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error(" Failed to read 'in-filter' Error='{}'", ex.what());
       }
       catch (...) {
@@ -794,8 +743,7 @@ CWebObj::doLoadConfig(void)
       }
     }
     else {
-      spdlog::debug(
-        " Failed to read LOGGING 'in-filter' Defaults will be used.");
+      spdlog::debug(" Failed to read LOGGING 'in-filter' Defaults will be used.");
     }
 
     // IN mask
@@ -804,7 +752,7 @@ CWebObj::doLoadConfig(void)
         std::string str = j["in-mask"].get<std::string>();
         vscp_readMaskFromString(&m_filterIn, str.c_str());
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error(" Failed to read 'in-mask' Error='{}'", ex.what());
       }
       catch (...) {
@@ -821,7 +769,7 @@ CWebObj::doLoadConfig(void)
         std::string str = j["in-filter"].get<std::string>();
         vscp_readFilterFromString(&m_filterOut, str.c_str());
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error(" Failed to read 'out-filter' Error='{}'", ex.what());
       }
       catch (...) {
@@ -838,7 +786,7 @@ CWebObj::doLoadConfig(void)
         std::string str = j["out-mask"].get<std::string>();
         vscp_readMaskFromString(&m_filterOut, str.c_str());
       }
-      catch (const std::exception& ex) {
+      catch (const std::exception &ex) {
         spdlog::error(" Failed to read 'out-mask' Error='{}'", ex.what());
       }
       catch (...) {
@@ -942,17 +890,14 @@ CWebObj::doLoadConfig(void)
 
     if (j.contains("listening-ports") && j["listening-ports"].is_array()) {
       std::string str;
-      for (json::iterator it = j["listening-ports"].begin();
-           it != j["listening-ports"].end();
-           ++it) {
+      for (json::iterator it = j["listening-ports"].begin(); it != j["listening-ports"].end(); ++it) {
         if (str.length())
           str += ",";
         str += *it;
       }
       m_web_listening_ports = str;
     }
-    else if (j.contains("listening-ports") &&
-             j["listening-ports"].is_string()) {
+    else if (j.contains("listening-ports") && j["listening-ports"].is_string()) {
       m_web_listening_ports = j["listening-ports"].get<std::string>();
     }
 
@@ -962,10 +907,8 @@ CWebObj::doLoadConfig(void)
     // Changing the domain retroactively will render the existing passwords
     // useless.
 
-    if (j.contains("authentication-domain") &&
-        j["authentication-domain"].is_string()) {
-      m_web_authentication_domain =
-        j["authentication-domain"].get<std::string>();
+    if (j.contains("authentication-domain") && j["authentication-domain"].is_string()) {
+      m_web_authentication_domain = j["authentication-domain"].get<std::string>();
     }
 
     // index-files:
@@ -980,9 +923,7 @@ CWebObj::doLoadConfig(void)
 
     if (j.contains("index-files") && j["index-files"].is_array()) {
       std::string str;
-      for (json::iterator it = j["index-files"].begin();
-           it != j["index-files"].end();
-           ++it) {
+      for (json::iterator it = j["index-files"].begin(); it != j["index-files"].end(); ++it) {
         if (str.length())
           str += ",";
         str += *it;
@@ -999,8 +940,7 @@ CWebObj::doLoadConfig(void)
     // processed if they are directed to the domain. If disabled, absolute URLs
     // to any host will be accepted.
 
-    if (j.contains("enable-auth-domain-check") &&
-        j["enable-auth-domain-check"].is_boolean()) {
+    if (j.contains("enable-auth-domain-check") && j["enable-auth-domain-check"].is_boolean()) {
       m_enable_auth_domain_check = j["enable-auth-domain-check"].get<bool>();
     }
 
@@ -1027,9 +967,7 @@ CWebObj::doLoadConfig(void)
     // All Paths must be full file paths.
     if (j.contains("protect-uri") && j["protect-uri"].is_array()) {
       std::string str;
-      for (json::iterator it = j["protect-uri"].begin();
-           it != j["protect-uri"].end();
-           ++it) {
+      for (json::iterator it = j["protect-uri"].begin(); it != j["protect-uri"].end(); ++it) {
         if (str.length())
           str += ",";
         str += *it;
@@ -1061,8 +999,7 @@ CWebObj::doLoadConfig(void)
 
     if (j.contains("throttle") && j["throttle"].is_array()) {
       std::string str;
-      for (json::iterator it = j["throttle"].begin(); it != j["throttle"].end();
-           ++it) {
+      for (json::iterator it = j["throttle"].begin(); it != j["throttle"].end(); ++it) {
         if (str.length())
           str += ",";
         str += *it;
@@ -1076,10 +1013,8 @@ CWebObj::doLoadConfig(void)
     // enable-directory-listing : true,
     // Enable directory listing, either yes or no.
 
-    if (j.contains("enable-directory-listing") &&
-        j["enable-directory-listing"].is_boolean()) {
-      m_web_enable_directory_listing =
-        j["enable-directory-listing"].get<bool>();
+    if (j.contains("enable-directory-listing") && j["enable-directory-listing"].is_boolean()) {
+      m_web_enable_directory_listing = j["enable-directory-listing"].get<bool>();
     }
 
     // enable-keep-alive : "false",
@@ -1096,8 +1031,7 @@ CWebObj::doLoadConfig(void)
     // configuration option might be removed and automatically set to yes if a
     // timeout > 0 is set.
 
-    if (j.contains("enable-keep-alive") &&
-        j["enable-keep-alive"].is_boolean()) {
+    if (j.contains("enable-keep-alive") && j["enable-keep-alive"].is_boolean()) {
       m_web_enable_keep_alive = j["enable-keep-alive"].get<bool>();
     }
 
@@ -1119,8 +1053,7 @@ CWebObj::doLoadConfig(void)
     // versions may drop the enable_keep_alive configuration value and
     // automatically use keep-alive if keep_alive_timeout_ms is not 0.
 
-    if (j.contains("keep-alive-timeout-ms") &&
-        j["keep-alive-timeout-ms"].is_number()) {
+    if (j.contains("keep-alive-timeout-ms") && j["keep-alive-timeout-ms"].is_number()) {
       m_web_keep_alive_timeout_ms = j["keep-alive-timeout-ms"].get<long>();
     }
 
@@ -1142,8 +1075,7 @@ CWebObj::doLoadConfig(void)
     //                            is enabled)
     // To learn more about subnet masks, see the Wikipedia page on Subnetwork.
 
-    if (j.contains("access-control-list") &&
-        j["access-control-list"].is_string()) {
+    if (j.contains("access-control-list") && j["access-control-list"].is_string()) {
       m_web_access_control_list = j["access-control-list"].get<std::string>();
     }
 
@@ -1154,17 +1086,14 @@ CWebObj::doLoadConfig(void)
 
     if (j.contains("extra-mime-types") && j["extra-mime-types"].is_array()) {
       std::string str;
-      for (json::iterator it = j["extra-mime-types"].begin();
-           it != j["extra-mime-types"].end();
-           ++it) {
+      for (json::iterator it = j["extra-mime-types"].begin(); it != j["extra-mime-types"].end(); ++it) {
         if (str.length())
           str += ",";
         str += *it;
       }
       m_web_extra_mime_types = str;
     }
-    else if (j.contains("extra-mime-types") &&
-             j["extra-mime-types"].is_string()) {
+    else if (j.contains("extra-mime-types") && j["extra-mime-types"].is_string()) {
       m_web_extra_mime_types = j["extra-mime-types"].get<std::string>();
     }
 
@@ -1209,8 +1138,7 @@ CWebObj::doLoadConfig(void)
     //
     // CivetWeb -url_rewrite_patterns /~joe/=/home/joe/,/~bill=/home/bill/
 
-    if (j.contains("url-rewrite-patterns") &&
-        j["url-rewrite-patterns"].is_string()) {
+    if (j.contains("url-rewrite-patterns") && j["url-rewrite-patterns"].is_string()) {
       m_web_url_rewrite_patterns = j["url-rewrite-patterns"].get<std::string>();
     }
 
@@ -1225,8 +1153,7 @@ CWebObj::doLoadConfig(void)
     // hide all files with a certain extension, make sure to use **.extension
     // (not just *.extension).
 
-    if (j.contains("hide-file-patterns") &&
-        j["hide-file-patterns"].is_string()) {
+    if (j.contains("hide-file-patterns") && j["hide-file-patterns"].is_string()) {
       m_web_hide_file_patterns = j["hide-file-patterns"].get<std::string>();
     }
 
@@ -1235,8 +1162,7 @@ CWebObj::doLoadConfig(void)
     // If a client intends to keep long-running connection, either increase this
     // value or (better) use keep-alive messages.
 
-    if (j.contains("request-timeout-ms") &&
-        j["request-timeout-ms"].is_number()) {
+    if (j.contains("request-timeout-ms") && j["request-timeout-ms"].is_number()) {
       m_web_request_timeout_ms = j["request-timeout-ms"].get<long>();
     }
 
@@ -1272,10 +1198,8 @@ CWebObj::doLoadConfig(void)
     // online tools e.g. this generator
     // http://www.askapache.com/online-tools/htpasswd-generator
 
-    if (j.contains("per-directory-auth-file") &&
-        j["per-directory-auth-file"].is_string()) {
-      m_web_per_directory_auth_file =
-        j["per-directory-auth-file"].get<std::string>();
+    if (j.contains("per-directory-auth-file") && j["per-directory-auth-file"].is_string()) {
+      m_web_per_directory_auth_file = j["per-directory-auth-file"].get<std::string>();
     }
 
     // ssi-patterns : "**.shtml$|**.shtm$"
@@ -1321,10 +1245,8 @@ CWebObj::doLoadConfig(void)
     // sharing (CORS). See the Wikipedia page on CORS.
     // http://en.wikipedia.org/wiki/Cross-origin_resource_sharing
 
-    if (j.contains("access-control-allow-origin") &&
-        j["access-control-allow-origin"].is_string()) {
-      m_web_access_control_allow_origin =
-        j["access-control-allow-origin"].get<std::string>();
+    if (j.contains("access-control-allow-origin") && j["access-control-allow-origin"].is_string()) {
+      m_web_access_control_allow_origin = j["access-control-allow-origin"].get<std::string>();
     }
 
     // access-control-allow-methods : "*"
@@ -1338,10 +1260,8 @@ CWebObj::doLoadConfig(void)
     // valid HTTP methods, the pre-flight will return exactly this list as
     // allowed method. If set in any other way, the result is unspecified.
 
-    if (j.contains("access-control-allow-methods") &&
-        j["access-control-allow-methods"].is_string()) {
-      m_web_access_control_allow_methods =
-        j["access-control-allow-methods"].get<std::string>();
+    if (j.contains("access-control-allow-methods") && j["access-control-allow-methods"].is_string()) {
+      m_web_access_control_allow_methods = j["access-control-allow-methods"].get<std::string>();
     }
 
     // access-control-allow-headers : "*"
@@ -1354,10 +1274,8 @@ CWebObj::doLoadConfig(void)
     // pre-flight will return exactly this list as allowed headers. If set in
     // any other way, the result is unspecified.
 
-    if (j.contains("access-control-allow-headers") &&
-        j["access-control-allow-headers"].is_string()) {
-      m_web_access_control_allow_headers =
-        j["access-control-allow-headers"].get<std::string>();
+    if (j.contains("access-control-allow-headers") && j["access-control-allow-headers"].is_string()) {
+      m_web_access_control_allow_headers = j["access-control-allow-headers"].get<std::string>();
     }
 
     // error-pages : ""
@@ -1404,10 +1322,8 @@ CWebObj::doLoadConfig(void)
     //
     // This will take precedence over the static_file_max_age option.
 
-    if (j.contains("static-file-cache-control") &&
-        j["static-file-cache-control"].is_string()) {
-      m_web_static_file_cache_control =
-        j["static-file-cache-control"].get<std::string>();
+    if (j.contains("static-file-cache-control") && j["static-file-cache-control"].is_string()) {
+      m_web_static_file_cache_control = j["static-file-cache-control"].get<std::string>();
     }
 
     // static-file-max-age : 3600
@@ -1422,8 +1338,7 @@ CWebObj::doLoadConfig(void)
     // will send "do not cache at all" headers for all static files. For values
     // <0 and values >31622400 (366 days), the behaviour is undefined.
 
-    if (j.contains("static-file-max-age") &&
-        j["static-file-max-age"].is_number()) {
+    if (j.contains("static-file-max-age") && j["static-file-max-age"].is_number()) {
       m_web_static_file_max_age = j["static-file-max-age"].get<long>();
     }
 
@@ -1438,10 +1353,8 @@ CWebObj::doLoadConfig(void)
     // set to -1, no Strict-Transport-Security header will be sent. For values
     // <-1 and values >31622400, the behaviour is undefined.
 
-    if (j.contains("strict-transport-security-max-age") &&
-        j["strict-transport-security-max-age"].is_number()) {
-      m_web_strict_transport_security_max_age =
-        j["strict-transport-security-max-age"].get<long>();
+    if (j.contains("strict-transport-security-max-age") && j["strict-transport-security-max-age"].is_number()) {
+      m_web_strict_transport_security_max_age = j["strict-transport-security-max-age"].get<long>();
     }
 
     // allow-sendfile-call : true
@@ -1452,8 +1365,7 @@ CWebObj::doLoadConfig(void)
     // connections, this call may be broken for some file systems and some
     // operating system versions.
 
-    if (j.contains("allow-sendfile-call") &&
-        j["allow-sendfile-call"].is_boolean()) {
+    if (j.contains("allow-sendfile-call") && j["allow-sendfile-call"].is_boolean()) {
       m_web_allow_sendfile_call = j["allow-sendfile-call"].get<bool>();
     }
 
@@ -1551,10 +1463,8 @@ CWebObj::doLoadConfig(void)
     // This feature can be used to completely hide the script extension from the
     // URL.
 
-    if (j.contains("allow-index-script-resource") &&
-        j["allow-index-script-resource"].is_boolean()) {
-      m_web_allow_index_script_resource =
-        j["allow-index-script-resource"].get<bool>();
+    if (j.contains("allow-index-script-resource") && j["allow-index-script-resource"].is_boolean()) {
+      m_web_allow_index_script_resource = j["allow-index-script-resource"].get<bool>();
     }
 
     // run_as_user : ""
@@ -1601,7 +1511,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_certificate = jj["certificate"].get<std::string>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error(" Failed to read 'certificate' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1618,21 +1528,17 @@ CWebObj::doLoadConfig(void)
 
       if (jj.contains("certificate-chain")) {
         try {
-          m_web_ssl_certificate_chain =
-            jj["certificate-chain"].get<std::string>();
+          m_web_ssl_certificate_chain = jj["certificate-chain"].get<std::string>();
         }
-        catch (const std::exception& ex) {
-          spdlog::error(" Failed to read 'certificate-chain' Error='{}'",
-                        ex.what());
+        catch (const std::exception &ex) {
+          spdlog::error(" Failed to read 'certificate-chain' Error='{}'", ex.what());
         }
         catch (...) {
-          spdlog::error(
-            " Failed to read 'certificate-chain' due to unknown error.");
+          spdlog::error(" Failed to read 'certificate-chain' due to unknown error.");
         }
       }
       else {
-        spdlog::debug(
-          " Failed to read 'certificate-chain' Defaults will be used.");
+        spdlog::debug(" Failed to read 'certificate-chain' Defaults will be used.");
       }
 
       // verify peer: false
@@ -1642,7 +1548,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_verify_peer = jj["verify-peer"].get<bool>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error(" Failed to read 'verify-peer' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1664,7 +1570,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_ca_path = jj["ca-path"].get<std::string>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error(" Failed to read 'ca-path' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1683,7 +1589,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_ca_file = jj["ca-file"].get<std::string>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error(" Failed to read 'ca-file' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1702,7 +1608,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_verify_depth = jj["verify-depth"].get<uint16_t>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error(" Failed to read 'verify-depth' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1719,21 +1625,17 @@ CWebObj::doLoadConfig(void)
 
       if (jj.contains("default-verify-paths")) {
         try {
-          m_web_ssl_default_verify_paths =
-            jj["default-verify-paths"].get<bool>();
+          m_web_ssl_default_verify_paths = jj["default-verify-paths"].get<bool>();
         }
-        catch (const std::exception& ex) {
-          spdlog::error("Failed to read 'default-verify-paths' Error='{}'",
-                        ex.what());
+        catch (const std::exception &ex) {
+          spdlog::error("Failed to read 'default-verify-paths' Error='{}'", ex.what());
         }
         catch (...) {
-          spdlog::error(
-            "Failed to read 'default-verify-paths' due to unknown error.");
+          spdlog::error("Failed to read 'default-verify-paths' due to unknown error.");
         }
       }
       else {
-        spdlog::debug(
-          " Failed to read 'default-verify-paths' Defaults will be used.");
+        spdlog::debug(" Failed to read 'default-verify-paths' Defaults will be used.");
       }
 
       // Chiper list
@@ -1750,7 +1652,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_cipher_list = jj["cipher-list"].get<std::string>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error("Failed to read 'cipher-list' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1781,18 +1683,15 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_protocol_version = jj["protocol-version"].get<uint16_t>();
         }
-        catch (const std::exception& ex) {
-          spdlog::error("Failed to read 'protocol-version' Error='{}'",
-                        ex.what());
+        catch (const std::exception &ex) {
+          spdlog::error("Failed to read 'protocol-version' Error='{}'", ex.what());
         }
         catch (...) {
-          spdlog::error(
-            "Failed to read 'protocol-version' due to unknown error.");
+          spdlog::error("Failed to read 'protocol-version' due to unknown error.");
         }
       }
       else {
-        spdlog::debug(
-          " Failed to read 'protocol-version' Defaults will be used.");
+        spdlog::debug(" Failed to read 'protocol-version' Defaults will be used.");
       }
 
       // Short trust: false
@@ -1811,7 +1710,7 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_short_trust = jj["short-trust"].get<bool>();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception &ex) {
           spdlog::error("Failed to read 'short-trust' Error='{}'", ex.what());
         }
         catch (...) {
@@ -1833,18 +1732,15 @@ CWebObj::doLoadConfig(void)
         try {
           m_web_ssl_cache_timeout = jj["ssl-cache-timeout"].get<long>();
         }
-        catch (const std::exception& ex) {
-          spdlog::error("Failed to read 'ssl-cache-timeout' Error='{}'",
-                        ex.what());
+        catch (const std::exception &ex) {
+          spdlog::error("Failed to read 'ssl-cache-timeout' Error='{}'", ex.what());
         }
         catch (...) {
-          spdlog::error(
-            "Failed to read 'ssl-cache-timeout' due to unknown error.");
+          spdlog::error("Failed to read 'ssl-cache-timeout' due to unknown error.");
         }
       }
       else {
-        spdlog::debug(
-          " Failed to read 'ssl-cache-timeout' Defaults will be used.");
+        spdlog::debug(" Failed to read 'ssl-cache-timeout' Defaults will be used.");
       }
 
     } // TLS
@@ -1877,10 +1773,8 @@ CWebObj::doLoadConfig(void)
       json jj = j["duktape"];
 
       // duktape-script-patterns
-      if (jj.contains("duktape-script-patterns") &&
-          jj["duktape-script-patterns"].is_string()) {
-        m_web_duktape_script_patterns =
-          jj["duktape-script-patterns"].get<std::string>();
+      if (jj.contains("duktape-script-patterns") && jj["duktape-script-patterns"].is_string()) {
+        m_web_duktape_script_patterns = jj["duktape-script-patterns"].get<std::string>();
       }
     } // Duktape
 
@@ -1890,39 +1784,28 @@ CWebObj::doLoadConfig(void)
       json jj = j["lua"];
 
       // lua-preload-file
-      if (jj.contains("lua-preload-file") &&
-          jj["lua-preload-file"].is_string()) {
+      if (jj.contains("lua-preload-file") && jj["lua-preload-file"].is_string()) {
         m_web_lua_preload_file = jj["lua-preload-file"].get<std::string>();
       }
       // lua-script-patterns
-      if (jj.contains("lua-script-patterns") &&
-          jj["lua-script-patterns"].is_string()) {
-        m_web_lua_script_patterns =
-          jj["lua-script-patterns"].get<std::string>();
+      if (jj.contains("lua-script-patterns") && jj["lua-script-patterns"].is_string()) {
+        m_web_lua_script_patterns = jj["lua-script-patterns"].get<std::string>();
       }
       // lua-server-page_patterns
-      if (jj.contains("lua-server-page_patterns") &&
-          jj["lua-server-page_patterns"].is_string()) {
-        m_web_lua_server_page_patterns =
-          jj["lua-server-page_patterns"].get<std::string>();
+      if (jj.contains("lua-server-page_patterns") && jj["lua-server-page_patterns"].is_string()) {
+        m_web_lua_server_page_patterns = jj["lua-server-page_patterns"].get<std::string>();
       }
       // lua-websocket-patterns
-      if (jj.contains("lua-websocket-patterns") &&
-          jj["lua-websocket-patterns"].is_string()) {
-        m_web_lua_websocket_patterns =
-          jj["lua-websocket-patterns"].get<std::string>();
+      if (jj.contains("lua-websocket-patterns") && jj["lua-websocket-patterns"].is_string()) {
+        m_web_lua_websocket_patterns = jj["lua-websocket-patterns"].get<std::string>();
       }
       // lua-background-script
-      if (jj.contains("lua-background-script") &&
-          jj["lua-background-script"].is_string()) {
-        m_web_lua_background_script =
-          jj["lua-background-script"].get<std::string>();
+      if (jj.contains("lua-background-script") && jj["lua-background-script"].is_string()) {
+        m_web_lua_background_script = jj["lua-background-script"].get<std::string>();
       }
       // lua-background-script-params
-      if (jj.contains("lua-background-script-params") &&
-          jj["lua-background-script-params"].is_string()) {
-        m_web_lua_background_script_params =
-          jj["lua-background-script-params"].get<std::string>();
+      if (jj.contains("lua-background-script-params") && jj["lua-background-script-params"].is_string()) {
+        m_web_lua_background_script_params = jj["lua-background-script-params"].get<std::string>();
       }
     }
 
@@ -1962,14 +1845,12 @@ CWebObj::doLoadConfig(void)
     }
 
     // websocket-timeout-ms : 2000,
-    if (j.contains("websocket-timeout-ms") &&
-        j["websocket-timeout-ms"].is_number()) {
+    if (j.contains("websocket-timeout-ms") && j["websocket-timeout-ms"].is_number()) {
       m_websocket_timeout_ms = j["websocket-timeout-ms"].get<long>();
     }
 
     // enable-websocket-ping-pong : false,
-    if (j.contains("enable-websocket-ping-pong") &&
-        j["enable-websocket-ping-pong"].is_boolean()) {
+    if (j.contains("enable-websocket-ping-pong") && j["enable-websocket-ping-pong"].is_boolean()) {
       bEnable_websocket_ping_pong = j["enable-websocket-ping-pong"].get<bool>();
     }
 
@@ -2138,17 +2019,17 @@ CWebObj::doLoadConfig(void)
 //     return true;
 // }
 
-#define TEMPLATE_SAVE_CONFIG                                                   \
-  "<setup "                                                                    \
-  " host=\"%s\" "                                                              \
-  " port=\"%d\" "                                                              \
-  " user=\"%s\" "                                                              \
-  " password=\"%s\" "                                                          \
-  " rxfilter=\"%s\" "                                                          \
-  " rxmask=\"%s\" "                                                            \
-  " txfilter=\"%s\" "                                                          \
-  " txmask=\"%s\" "                                                            \
-  " responsetimeout=\"%lu\" "                                                  \
+#define TEMPLATE_SAVE_CONFIG                                                                                           \
+  "<setup "                                                                                                            \
+  " host=\"%s\" "                                                                                                      \
+  " port=\"%d\" "                                                                                                      \
+  " user=\"%s\" "                                                                                                      \
+  " password=\"%s\" "                                                                                                  \
+  " rxfilter=\"%s\" "                                                                                                  \
+  " rxmask=\"%s\" "                                                                                                    \
+  " txfilter=\"%s\" "                                                                                                  \
+  " txmask=\"%s\" "                                                                                                    \
+  " responsetimeout=\"%lu\" "                                                                                          \
   "/>"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2410,18 +2291,18 @@ CWebObj::doLoadConfig(void)
 //     return true;
 // }
 
-
-
 //////////////////////////////////////////////////////////////////////
 // Send worker thread
 //
+// The task here is top deliver outgoing events to each clients queue
+//
 
-void*
-workerThreadSend(void* pData)
+void *
+workerThreadSend(void *pData)
 {
-  spdlog::get("logger")->debug("Starting worker thread");
+  spdlog::get("logger")->debug("Starting transmitt worker thread");
 
-  CWebObj* pObj = (CWebObj*)pData;
+  CWebObj *pObj = (CWebObj *) pData;
   if (NULL == pObj) {
     return NULL;
   }
@@ -2429,32 +2310,62 @@ workerThreadSend(void* pData)
   // Work until the end
   while (!pObj->m_bQuit) {
 
-    if ((-1 == vscp_sem_wait(&pObj->m_semSendQueue, 500)) &&
-      errno == ETIMEDOUT) {
+    if ((-1 == vscp_sem_wait(&pObj->m_semSendQueue, 500)) && errno == ETIMEDOUT) {
       continue;
     }
 
-    // Check if there is event(s) to send
-    if (pObj->m_sendList.size()) {
+    // // Check if there is event(s) to send
+    // if (pObj->m_sendList.size()) {
 
-      // Yes there are data to send
-      pthread_mutex_lock(&pObj->m_mutexSendQueue);
-      vscpEvent* pEvent = pObj->m_sendList.front();
-  
-      pObj->m_sendList.pop_front();
-      pthread_mutex_unlock(&pObj->m_mutexSendQueue);
+    //   // Yes there are data to send
+    //   pthread_mutex_lock(&pObj->m_mutexSendQueue);
+    //   vscpEvent *pEvent = pObj->m_sendList.front();
+    //   pObj->m_sendList.pop_front();
+    //   pthread_mutex_unlock(&pObj->m_mutexSendQueue);
+
+    //   if (nullptr == pEvent) {
+    //     spdlog::get("logger")->error("NULL event in send queue.");
+    //     continue;
+    //   }
+
+      // Send event to all open ws1 and ws2 websockets
+      websock_post_outgoingEvent(pObj);
 
       // Yes there is data to send
       // Send it out to the remote server
+    //   pthread_mutex_lock(&pObj->m_mutex_clientList);
+    //   pObj->m_clientList.sendEventAllClients(pEvent);
+    //   pthread_mutex_unlock(&pObj->m_mutex_clientList);
 
-      //pObj->m_srvRemoteSend.doCmdSend(pEvent);
-      vscp_deleteEvent_v2(&pEvent);
-    }
-
+    //   vscp_deleteEvent_v2(&pEvent);
+    // }
   }
 
-  spdlog::get("logger")->debug("Ending worker thread");
+  spdlog::get("logger")->debug("Ending transmitt worker thread");
 
   return NULL;
 }
 
+//////////////////////////////////////////////////////////////////////
+// Receive worker thread
+//
+
+void * 
+workerThreadReceive(void *pData)
+{
+  spdlog::get("logger")->debug("Starting receive worker thread");
+
+  CWebObj *pObj = (CWebObj *) pData;
+  if (NULL == pObj) {
+    return NULL;
+  }
+
+  // Work until the end
+  while (!pObj->m_bQuit) {
+    usleep(5000);
+  }
+
+  spdlog::get("logger")->debug("Ending receive worker thread");
+
+  return NULL;
+}

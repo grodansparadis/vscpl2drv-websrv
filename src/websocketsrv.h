@@ -105,11 +105,11 @@ class CWebObj;
     websocket session
 */
 
-class websock_session {
+class CWebsockSession {
 
 public:
-  websock_session(void);
-  ~websock_session(void);
+  CWebsockSession(void);
+  ~CWebsockSession(void);
 
   // ws type 1/2
   uint8_t m_wstypes;
@@ -213,6 +213,6 @@ public:
 // Public functions
 
 void
-websock_post_incomingEvents(const websock_session* pSession);
+websock_post_outgoingEvent(CWebObj *pObj);
 
 #endif

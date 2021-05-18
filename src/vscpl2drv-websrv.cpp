@@ -64,7 +64,7 @@ void
 _fini() __attribute__((destructor));
 
 // This map holds driver handles/objects
-static std::map<long, CWebObj*> g_ifMap;
+static std::map<long, CWebObj *> g_ifMap;
 
 // Mutex for the map object
 static pthread_mutex_t g_mapMutex;
@@ -94,12 +94,10 @@ _fini()
 
   LOCK_MUTEX(g_mapMutex);
 
-  for (std::map<long, CWebObj*>::iterator it = g_ifMap.begin();
-       it != g_ifMap.end();
-       ++it) {
+  for (std::map<long, CWebObj *>::iterator it = g_ifMap.begin(); it != g_ifMap.end(); ++it) {
     // std::cout << it->first << " => " << it->second << '\n';
 
-    CWebObj* pif = it->second;
+    CWebObj *pif = it->second;
     if (NULL != pif) {
       // pif->m_srvRemoteSend.doCmdClose();
       // pif->m_srvRemoteReceive.doCmdClose();
@@ -119,9 +117,9 @@ _fini()
 //
 
 long
-addDriverObject(CWebObj* pif)
+addDriverObject(CWebObj *pif)
 {
-  std::map<long, CWebObj*>::iterator it;
+  std::map<long, CWebObj *>::iterator it;
   long h = 0;
 
   LOCK_MUTEX(g_mapMutex);
@@ -145,10 +143,10 @@ addDriverObject(CWebObj* pif)
 // getDriverObject
 //
 
-CWebObj*
+CWebObj *
 getDriverObject(long h)
 {
-  std::map<long, CWebObj*>::iterator it;
+  std::map<long, CWebObj *>::iterator it;
   long idx = h - 1681;
 
   // Check if valid handle
@@ -171,7 +169,7 @@ getDriverObject(long h)
 void
 removeDriverObject(long h)
 {
-  std::map<long, CWebObj*>::iterator it;
+  std::map<long, CWebObj *>::iterator it;
   long idx = h - 1681;
 
   // Check if valid handle
@@ -182,7 +180,7 @@ removeDriverObject(long h)
   LOCK_MUTEX(g_mapMutex);
   it = g_ifMap.find(idx);
   if (it != g_ifMap.end()) {
-    CWebObj* pObj = it->second;
+    CWebObj *pObj = it->second;
     if (NULL != pObj) {
       delete pObj;
       pObj = NULL;
@@ -193,7 +191,7 @@ removeDriverObject(long h)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//                         V S C P   D R I V E R -  A P I
+//                        V S C P   D R I V E R -  A P I
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -201,11 +199,11 @@ removeDriverObject(long h)
 //
 
 extern "C" long
-VSCPOpen(const char* pPathConfig, const char* pguid)
+VSCPOpen(const char *pPathConfig, const char *pguid)
 {
   long h = 0;
 
-  CWebObj* pdrvObj = new CWebObj();
+  CWebObj *pdrvObj = new CWebObj();
   if (NULL != pdrvObj) {
     cguid guid(pguid);
     std::string path = pPathConfig;
@@ -230,7 +228,7 @@ VSCPOpen(const char* pPathConfig, const char* pguid)
 extern "C" int
 VSCPClose(long handle)
 {
-  CWebObj* pdrvObj = getDriverObject(handle);
+  CWebObj *pdrvObj = getDriverObject(handle);
   if (NULL == pdrvObj) {
     return 0;
   }
@@ -246,9 +244,9 @@ VSCPClose(long handle)
 //
 
 extern "C" int
-VSCPWrite(long handle, const vscpEvent* pEvent, unsigned long timeout)
+VSCPWrite(long handle, const vscpEvent *pEvent, unsigned long timeout)
 {
-  CWebObj* pdrvObj = getDriverObject(handle);
+  CWebObj *pdrvObj = getDriverObject(handle);
   if (NULL == pdrvObj) {
     return CANAL_ERROR_MEMORY;
   }
@@ -263,7 +261,7 @@ VSCPWrite(long handle, const vscpEvent* pEvent, unsigned long timeout)
 //
 
 extern "C" int
-VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
+VSCPRead(long handle, vscpEvent *pEvent, unsigned long timeout)
 {
   int rv = 0;
 
@@ -272,7 +270,7 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
     return CANAL_ERROR_PARAMETER;
   }
 
-  CWebObj* pdrvObj = getDriverObject(handle);
+  CWebObj *pdrvObj = getDriverObject(handle);
   if (NULL == pdrvObj) {
     return CANAL_ERROR_MEMORY;
   }
@@ -300,7 +298,7 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
   }
 
   pthread_mutex_lock(&pdrvObj->m_mutexReceiveQueue);
-  vscpEvent* pLocalEvent = pdrvObj->m_receiveList.front();
+  vscpEvent *pLocalEvent = pdrvObj->m_receiveList.front();
   pdrvObj->m_receiveList.pop_front();
   pthread_mutex_unlock(&pdrvObj->m_mutexReceiveQueue);
   if (NULL == pLocalEvent)
@@ -319,7 +317,6 @@ VSCPRead(long handle, vscpEvent* pEvent, unsigned long timeout)
 extern "C" unsigned long
 VSCPGetVersion(void)
 {
-  unsigned long ver = MAJOR_VERSION << 24 | MINOR_VERSION << 16 |
-                      RELEASE_VERSION << 8 | BUILD_VERSION;
+  unsigned long ver = MAJOR_VERSION << 24 | MINOR_VERSION << 16 | RELEASE_VERSION << 8 | BUILD_VERSION;
   return ver;
 }

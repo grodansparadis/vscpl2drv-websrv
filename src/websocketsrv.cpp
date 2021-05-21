@@ -189,7 +189,8 @@ websock_authentication(struct mg_connection *conn,
   bool bValidHost = false;
 
   // Check pointers
-  if ((nullptr == conn) || (nullptr == pSession) || !(ctx = mg_get_context(conn)) || !(reqinfo = mg_get_request_info(conn))) {
+  if ((nullptr == conn) || (nullptr == pSession) || !(ctx = mg_get_context(conn)) ||
+      !(reqinfo = mg_get_request_info(conn))) {
     spdlog::get("logger")->error("[ws] Authentication: Invalid "
                                  "pointers. ");
     return false;
@@ -274,9 +275,9 @@ websock_authentication(struct mg_connection *conn,
 
   // Log valid login
   spdlog::get("logger")->info("[ws] Authentication: Host [{}] "
-                               "User [{}] allowed to connect.",
-                               reqinfo->remote_addr,
-                               strUser);
+                              "User [{}] allowed to connect.",
+                              reqinfo->remote_addr,
+                              strUser);
 
   return true;
 }
@@ -1091,48 +1092,35 @@ ws1_command(struct mg_connection *conn, CWebsockSession *pSession, std::string &
 
       pthread_mutex_lock(&pSession->m_pClientItem->m_mutexClientInputQueue);
       if (!vscp_readFilterFromString(&pSession->m_pClientItem->m_filter, strTok)) {
-
         str = vscp_str_format(("-;SF;%d;%s"), (int) WEBSOCK_ERROR_SYNTAX_ERROR, WEBSOCK_STR_ERROR_SYNTAX_ERROR);
-
         mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, (const char *) str.c_str(), str.length());
-
         pthread_mutex_unlock(&pSession->m_pClientItem->m_mutexClientInputQueue);
         return;
       }
-
       pthread_mutex_unlock(&pSession->m_pClientItem->m_mutexClientInputQueue);
     }
     else {
-
       str = vscp_str_format(("-;SF;%d;%s"), (int) WEBSOCK_ERROR_SYNTAX_ERROR, WEBSOCK_STR_ERROR_SYNTAX_ERROR);
-
       mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, (const char *) str.c_str(), str.length());
-
       return;
     }
 
     // Get mask
     if (!tokens.empty()) {
-
       strTok = tokens.front();
       tokens.pop_front();
 
       pthread_mutex_lock(&pSession->m_pClientItem->m_mutexClientInputQueue);
       if (!vscp_readMaskFromString(&pSession->m_pClientItem->m_filter, strTok)) {
-
         str = vscp_str_format(("-;SF;%d;%s"), (int) WEBSOCK_ERROR_SYNTAX_ERROR, WEBSOCK_STR_ERROR_SYNTAX_ERROR);
-
         mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, (const char *) str.c_str(), str.length());
-
         pthread_mutex_unlock(&pSession->m_pClientItem->m_mutexClientInputQueue);
         return;
       }
-
       pthread_mutex_unlock(&pSession->m_pClientItem->m_mutexClientInputQueue);
     }
     else {
       str = vscp_str_format(("-;SF;%d;%s"), (int) WEBSOCK_ERROR_SYNTAX_ERROR, WEBSOCK_STR_ERROR_SYNTAX_ERROR);
-
       mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, (const char *) str.c_str(), str.length());
       return;
     }
@@ -1150,13 +1138,9 @@ ws1_command(struct mg_connection *conn, CWebsockSession *pSession, std::string &
 
     // Must be authorized to do this
     if ((nullptr == pSession->m_pClientItem) || !pSession->m_pClientItem->bAuthenticated) {
-
       str = vscp_str_format(("-;CLRQ;%d;%s"), (int) WEBSOCK_ERROR_NOT_AUTHORIZED, WEBSOCK_STR_ERROR_NOT_AUTHORIZED);
-
       mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT, (const char *) str.c_str(), str.length());
-
       spdlog::get("logger")->error("[ws1] User/host not authorized to clear the queue.");
-
       return; // We still leave channel open
     }
 
@@ -1305,9 +1289,7 @@ ws2_connectHandler(const struct mg_connection *conn, void *cbdata)
 
   // This is a WS2 type connection
   pSession->m_wstypes = WS_TYPE_2;
-
   mg_unlock_context(ctx);
-
   spdlog::get("logger")->error("[ws2] WS2 Connection: client {}", (reject ? "rejected" : "accepted"));
 
   return reject;

@@ -6,9 +6,11 @@
     Driver Linux: vscpl2drv-websrv.so
     Driver Windows: vscpl2drv-websrv.dll
 
-The tcp/ip driver act as a web/websocket(ws1/ws2) and REST server for the VSCP. Users or IoT/m2m devices with different privileges and rights can connect to the exported interface and send/receive VSCP events.
+The vscp2drv-websrv driver act as a web and a websocket(ws1/ws2) and a REST server for VSCP. Users or IoT/m2m devices with different privileges and rights can connect to the exported interface and send/receive VSCP events.
 
-Previously this driver was part of the VSCP daemon but is now separated as a VSCL level II driver to lessen the complexity of the daemon software. The functionality is the same.
+The web server is based on [Civetweb](https://github.com/civetweb/civetweb) and have [Lua](http://www.lua.org/) and [Duktape](https://duktape.org/) and [Sqlite3](https://www.sqlite.org/index.html) and much more enabled. I addition a VSCP rest interface and both of the VSCP websocket interfaces is implemented.
+
+Previously this driver was part of the VSCP daemon but is now separated as a VSCP level II driver to lessen the complexity of the daemon software. The functionality is still the same.
 
 ## Install the driver on Linux
 You can install the driver using the debian package with
@@ -161,9 +163,7 @@ in the build folder.
 
 ## Configuration
 
-### Linux
-
-#### VSCP daemon driver config
+### VSCP daemon configuration for driver
 
 The VSCP daemon configuration is (normally) located at */etc/vscp/vscpd.conf*. To use the vscpl2drv-websrv.so driver there must be an entry in the
 
@@ -183,81 +183,247 @@ section on the following format
 </driver>
 ```
 
-##### enable
+#### enable
 Set enable to "true" if the driver should be loaded.
 
-##### name
+#### name
 This is the name of the driver. Used when referring to it in different interfaces.
 
-##### path
+#### path
 This is the path to the driver. If you install from a Debian package this will be */usr/bin/vscpl2drv-websrv.so* and if you build and install the driver yourself it will be */usr/local/bin/vscpl2drv-websrv.so* or a custom location if you configured that.
 
-##### guid
+#### guid
 All level II drivers **must have** a unique GUID. There is many ways to obtain this GUID, Read more [here](https://grodansparadis.gitbooks.io/the-vscp-specification/vscp_globally_unique_identifiers.html).
 
-#### vscpl2drv-websrv driver config
 
-On start up the configuration is read from the path set in the driver configuration of the VSCP daemon, usually */etc/vscp/conf-file-name* and values are set from this location. If the **write** parameter is set to "true" the above location is a bad choice as the VSCP daemon will not be able to write to it. A better location is */var/lib/vscp/drivername/configure.xml* or some other writable location.
+
+### vscpl2drv-websrv driver configuration file
+
+When the VSCP daemon starts up the configuration for the driver is read from a JSON file specified by the path set in the driver configuration of the VSCP daemon. Usually this file is locatd at */etc/vscp/vscpl2drv-websrv*. 
+
+If the **write** parameter (see information below) is set to "true" the above location is a bad choice as the VSCP daemon will not be able to write to this location. A better location in this case is */var/lib/vscp/drivers/level2/vscpl2drv-websrv.json* or some other writable location of choice.
 
 The configuration file have the following format
 
 ```json
 {
     "write" : false,
-    "interface": "[s]tcp://ip-address:port",
+    "debug" : false,
+    "key-file": "/var/vscp/.key",
+    "path-users" : "/etc/vscp/users.json",
+    "encryption" : "none|aes128|aes192|aes256",
+
     "logging": { 
+        "console-enable": true,
+        "console-level": "trace",
+        "console-pattern": "[vcpl2drv-websrv] [%^%l%$] %v",
+        "file-enable": true,
         "file-log-level": "off|critical|error|warn|info|debug|trace",
-        "file-log-path" : "path to log file",
-        "file-log-pattern": "Pattern for log file",
+        "file-log-path" : "/var/log/vscp/vscpl1drv-websrv.log",
+        "file-log-pattern": "[vcpl2drv-websrv] [%^%l%$] %v",
         "file-log-max-size": 50000,
-        "file-log-max-files": 7,
-    },    
-    "auth-domain": "mydomain.com",
-    "key-file": "/var/vscp/.vscp.key",
-    "path-users" : "/etc/vscp/tcpip_srv_users.json",
-    "response-timeout" : 0,
+        "file-log-max-files": 7
+    }, 
+    "web" : {
+        "enable" : true,
+        "document-root": "/var/lib/vscp/web/html",
+        "listening-ports" : [
+            "[::]:8888r",
+            "[::]:8843s",
+            "8884"
+        ],
+        "authentication-domain": "mydomain.com",
+        "enable-auth-domain-check" : false,
+        "index-files" : [
+            "index.xhtml",
+            "index.html",
+            "index.htm",
+            "index.lp",
+            "index.lsp",
+            "index.lua",
+            "index.cgi",
+            "index.shtml",
+            "index.php"
+        ],        
+        "access-log-file" : "/var/log/vscp/vscpl2drv-websrv-access.log",
+        "error-log-file" : "/var/log/vscp/vscpl2drv-websrv-error.log",
+        "protect-uri" : "",
+        "throttle" : "",
+        "enable-directory-listing" : true,
+        "enable-keep-alive" : false,
+        "keep-alive-timeout-ms" : 0,
+        "access-control-list" : "",
+        "extra-mime-types" : "",
+        "num-threads" : 50,
+        "url-rewrite-patterns" : "",
+        "hide-file-patterns" : "",
+        "request-timeout-ms" : 10000,
+        "linger-timeout-ms" : 0,
+        "decode-url" : true,
+        "global-auth-file" : "",
+        "per-directory-auth-file" : "",
+        "ssi-patterns" : "",
+        "access-control-allow-origin" : "*",
+        "access-control-allow-methods" : "*",
+        "access-control-allow-headers" : "*",
+        "error-pages" : "",
+        "tcp-nodelay" : 0,
+        "static-file-cache-control" : "",
+        "static-file-max-age" : 3600,
+        "strict-transport-security-max-age" : 0,
+        "allow-sendfile-call" : true,
+        "additional-header" : "",
+        "max-request-size" : 16384,
+        "allow-index-script-resource" : false,
+        "tls": {
+            "certificate" : "/srv/vscp/certs/tcpip_server.pem",
+            "certificate-chain" : "",
+            "verify-peer" : false,
+            "ca-path" : "",
+            "ca-file" : "",
+            "verify-depth" : 9,
+            "default-verify-paths" : true,
+            "cipher-list" : "DES-CBC3-SHA:AES128-SHA:AES128-GCM-SHA256",
+            "protocol-version" : 3,
+            "ssl_cache_timeout": -1,
+            "short-trust" : false
+        },
+        "cgi" : {
+            "cgi-interpreter" : "",
+            "cgi-patterns" : "**.cgi$|**.pl$|**.php|**.py",
+            "cgi-environment" : ""    
+        },
+        "duktape" : {
+            "duktape-script-patterns" : "**.ssjs$"
+        },
+        "lua" : {
+            "lua-preload-file" : "",
+            "lua-script-patterns" : "**.lua$",
+            "lua-server-page_patterns" : "**.lp$|**.lsp$",
+            "lua-websocket-patterns" : "**.lua$",
+            "lua-background-script" : "",
+            "lua-background-script-params" : ""
+        }
+
+    },   
+    "restapi" : {
+        "enable" : true
+    },
+    "websocket" : {
+        "enable" : true,
+        "websocket-root" : "",
+        "websocket-timeout-ms" : 2000,
+        "enable-websocket-ping-pong" : false
+    },
+
+    
     "filter" : {
         "in-filter" : "incoming filter on string form",
         "in-mask" : "incoming mask on string form",
         "out-filter" : "outgoing filter on string form",
-        "out-mask" : "outgoing mask on string form",
-    },
-    "tls": {
-        "certificate" : "/srv/vscp/certs/tcpip_server.pem",
-        "certificate_chain" : "",
-        "verify_peer" : false,
-        "ca-path" : "",
-        "ca-file" : "",
-        "verify_depth" : 9,
-        "default-verify-paths" : true,
-        "cipher-list" : "DES-CBC3-SHA:AES128-SHA:AES128-GCM-SHA256",
-        "protocol-version" : 3,
-        "short-trust" : false
+        "out-mask" : "outgoing mask on string form"
     }
+    
 }
 ```
 
-##### file-log-level
-Set to one of "off | critical | error | warn | info | debug | trace" to set log level.
-
-##### file-log-path" : "path to log file",
-This is a writable path to a file that will get log information written to it. This can be a valuable to have if things does not behave as expected.
-
-##### file-log-pattern
-Pattern for log file rows.
-
-##### file-log-max-size
-Max size for log file before it will rotate and a new file is created. Default is 5 Mb.
-
-##### file-log-max-files
-Max number of log files to keep. Default is 7
-
-##### write
+#### write
 If write is true changes to the configuration file will be possible to save to disk. That is settings you do at runtime that can be saved and after that be persistent. The safest location for a configuration file is in the VSCP configuration folder */etc/vscp/*, but dynamic saves are not allowed to save data to this location if you don't run the VSCP daemon as root (which you should not). Next best place is to use the folder */var/lib/vscp/drivername/configure.json*. This folder is created and a default configuration is written here when the driver is installed.
 
 If you never intend to change driver parameters during runtime consider moving the configuration file to the VSCP daemon configuration folder.
 
 Currently this option is not enabled and is always set to false.
+
+#### debug
+Extra debugging information will be issued if you set this configuration value to true.
+
+#### key-file
+This is a path to a file that holds a 256-bit encryption value. The file should contain a 32 byte hexadecimal string.
+
+#### path-users
+
+This is the path to a file that contains access information for users of the webserver, the ws1 and ws2 web-interfaces and the REST interface.
+
+This file have the same format as and is shared by several VSCP drivers. The content is defined [here](https://grodansparadis.github.io/vscp-doc-spec/#/./appendix_a_users). 
+
+
+#### Logging
+
+Options for driver logging is set here.
+
+##### console-enable 
+Set to _true_ to log to the console.
+
+##### console-level
+Logging level for console log. Set to one of "off | critical | error | warn | info | debug | trace". 
+
+##### console-pattern
+The logging pattern for the console. The default is
+
+```
+"[vcpl2drv-websrv] [%^%l%$] %v"
+```
+Patterns are described [here](https://spdlog.docsforge.com/v1.x/3.custom-formatting/#pattern-flags).
+
+##### file-enable 
+Set to _true_ to log to the console.
+
+##### file-level
+Set to one of "off | critical | error | warn | info | debug | trace" to set log level.
+
+##### file-path" : "path to log file",
+This is a writable path to a file that will get log information written to it. This can be a valuable to have if things does not behave as expected.
+
+##### file-pattern
+The logging pattern for the console. The default is
+
+```
+"[vcpl2drv-websrv] [%^%l%$] %v"
+```
+Patterns are described [here](https://spdlog.docsforge.com/v1.x/3.custom-formatting/#pattern-flags).
+
+##### file-max-size
+Max size for log file before it will rotate and a new file is created. Default is 5 Mb.
+
+##### file-max-files
+Max number of log files to keep. Default is 7
+
+#### web
+
+Settings for the web interface.
+
+##### enable
+
+Set to _true_ to enable the web interface
+
+##### document-root
+
+This is the root folder  for web files. On Linux it default to _/var/lib/vscp/web/html_
+
+##### listening-ports
+
+This is a list of the ports that the web server will listen on. It can either be given as a JSON list on the following form
+
+```json
+"listening-ports" : [
+    "[::]:8888r",
+    "[::]:8843s",
+    "8884"
+],
+```
+
+or as a comma separated string
+
+```json
+"listening-ports" : "[::]:8888r,[::]:8843s,8884"
+```
+
+ - A _s_ after the port means the port is a secure TLS port.
+ - A _r_ after the port means the port will redirect to a secure port.
+
+ For a complete description go [here](https://github.com/civetweb/civetweb/blob/master/docs/UserManual.md#listening_ports-8080).
+
+-------------------------------------------------------------
 
 ##### interface
 Set the interface to listen on. Default is: *tcp://localhost:9598*. The interface is either secure (TLS) or insecure. It is not possible to define interfaces that accept connections of both types.
@@ -382,62 +548,8 @@ Disk IO performance can be improved when keeping the certificates and keys store
 
 **Default**: false
 
- #### Format for user database
+ 
 
- ```json
- {
-	"users" : [
-		{
-			"user" : "admin",
-            "fullname" : "Full name",
-            "note" : "note about user-item",
-			"credentials"  : "fastpbkdf2 over 'user:password' using 256 bit system key (stored: item:iv)",
-            "filter" : "outgoing filter",
-			"rights" : "comma separated list of rights",
-            "remotes" : "comma separated list of hosts First char: +=allow -deny",
-			"events" : "comma separated list of events "TX|RX|BOTH;vscp-class;vscp.type;priority"
-		}
-	]
-}
-```
-
-Any number of users can be specified
-
-##### user
-The login user name
-
-##### credentials
-fastpbkdf2 over "user:auth-domain:password" stored as 'pw:salt'
-
-credentials = encrypted_pw:iv where the encrypted_pw
-is calculated over md5(user:password)
-encrypted_pw = aes256(user,password,iv) encrypted with key 
-key = 256 bit, 32 byte number.
-user send "password" (no :) or encrypted_pw:iv (: present)
-
-##### rights
-Rights for this user as a 32-bit rights number.
-
-##### name
-Full name for user.
-
- ##### events
- This is a list with events the user is allowed to send and/or receive. If empty all events can be sent and received by the users.
-
- ###### class
- VSCP class. Can be set to -1 to allow all classes.
-
- ###### type
- VSCP type. Can be set to -1 to allow all types. 
-
- ###### dir
- The direction the user is allowed to handle. Set to "rx" to allow only receive. Set to "tx" to allow only transmit. Set to "both" or empty to allow sending and receiving.
-
-###### max-priority
-Max priority (0-7) this user can use for send events. Trying to send an event with a higher priority will replace the event value with the value set here. Note that 0 is the hightst priority.
-
-### Windows
-See information from Linux. The only difference is the disk location from where configuration data is fetched.
 
 ## Using the vscpl2drv-websrv driver
 

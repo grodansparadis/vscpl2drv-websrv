@@ -6,32 +6,36 @@
     Driver Linux: vscpl2drv-websrv.so
     Driver Windows: vscpl2drv-websrv.dll
 
-The tcp/ip driver act as a tcp/ip server for the [VSCP tcp/ip link protocol](https://grodansparadis.github.io/vscp-doc-spec/#/./vscp_over_tcp_ip). Users or IoT/m2m devices with different privileges and rights can connect to the exported interface and send/receive VSCP events.
+The tcp/ip driver act as a web/websocket(ws1/ws2) and REST server for the VSCP. Users or IoT/m2m devices with different privileges and rights can connect to the exported interface and send/receive VSCP events.
+
+Previously this driver was part of the VSCP daemon but is now separated as a VSCL level II driver to lessen the complexity of the daemon software. The functionality is the same.
 
 ## Install the driver on Linux
 You can install the driver using the debian package with
 
 > sudo apt install ./vscpl2drv-websrv_x.y.z.deb
 
-the driver will be installed to /var/lib/vscp/drivers/level2
+the driver will be installed to _/var/lib/vscp/drivers/level2_
 
-After installing the driver you need to add it to the vscpd.conf file (/etc/vscp/vscpd.conf). Se the *configuration* section below.
+After installing the driver you need to add it to the vscpd.conf file (/etc/vscp/vscpd.conf). See the *configuration* section below.
 
 You also need to set up a configuration file for the driver. If you don't need to dynamically edit the content of this file a good and safe location for this is in the */etc/vscp/* folder alongside the VSCP daemon configuration file.
 
-If you need to do dynamic configuration we recommend that you create the file in the */var/vscp/vscpl2drv-websrv.so*
+If you need to do dynamic configuration we recommend that you create the file in the */var/vscp/vscpl2drv-websrv.conf*
 
-A sample configuration file is make available in */usr/share/vscpl2drv-websrv.so* after installation.
+A sample configuration file is available in */usr/share/vscpl2drv-websrv* after installation.
 
 ## Install the driver on Windows
 tbd
 
 ## How to build the driver on Linux
 
-- sudo git clone https://github.com/grodansparadis/vscp.git
-- sudo https://github.com/grodansparadis/vscpl2drv-websrv.git development
-- sudo apt install pandoc           (comment: optional)
+- sudo apt update && sudo apt -y upgrade
 - sudo apt install build-essential
+- sudo apt install git
+- sudo git clone https://github.com/grodansparadis/vscp.git
+- sudo git clone https://github.com/grodansparadis/vscpl2drv-websrv.git
+- sudo apt install pandoc           (comment: optional)
 - sudo apt install cmake
 - sudo apt install libexpat-dev
 - sudo apt install libssl-dev
@@ -44,26 +48,9 @@ tbd
 - make install
 - sudo cpack ..                     (comment: only if you want to create install packages)
 
+Install of _pandoc_ is only needed if man pages needs to be rebuilt. This is normally already done and available in the repository.
 
-Install of pandoc is only needed if man pages needs to be rebuilt. This is normally already done and available in the repository.
-
-
-
-
-```
-git clone --recurse-submodules -j8 https://github.com/grodansparadis/vscpl2drv-websrv.so.git
-cd vscpl2drv-websrv
-./configure
-make
-make install
-```
-
-Default install folder when you build from source is */usr/local/lib*. You can change this with the --prefix option in the configure step. For example *--prefix /usr* to install to */usr/lib* as the debian install
-
-You need build-essentials and git installed on your system
-
->sudo apt update && sudo apt -y upgrade
->sudo apt install build-essential git
+Default install folder when you build from source is */usr/local/lib*. You can change this with the --prefix option in the build step. For example *--prefix /usr* to install to */usr/lib* as the debian install
 
 ## How to build the driver on Windows
 
@@ -115,7 +102,7 @@ You need to checkout the VSCP main repository code in addition to the driver rep
   git checkout development
 ``` 
 
-and the vscpl2drv-websrv code
+and the vscpl2drv-websrv source code
 
 ```bash
 git clone https://github.com/grodansparadis/vscpl2drv-websrv.git
@@ -191,7 +178,7 @@ section on the following format
 <driver enable="true"
     name="vscp-tcpip-srv"
     path-driver="/usr/lib/vscp/drivers/level2/vscpl2drv-websrv.so"
-    path-config="/etc/vscp/vscpl2drv-websrv.conf"
+    path-config="/etc/vscp/vscpl2drv-websrv.json"
     guid="FF:FF:FF:FF:FF:FF:FF:FC:88:99:AA:BB:CC:DD:EE:FF"
 </driver>
 ```
@@ -206,7 +193,7 @@ This is the name of the driver. Used when referring to it in different interface
 This is the path to the driver. If you install from a Debian package this will be */usr/bin/vscpl2drv-websrv.so* and if you build and install the driver yourself it will be */usr/local/bin/vscpl2drv-websrv.so* or a custom location if you configured that.
 
 ##### guid
-All level II drivers must have a unique GUID. There is many ways to obtain this GUID, Read more [here](https://grodansparadis.gitbooks.io/the-vscp-specification/vscp_globally_unique_identifiers.html).
+All level II drivers **must have** a unique GUID. There is many ways to obtain this GUID, Read more [here](https://grodansparadis.gitbooks.io/the-vscp-specification/vscp_globally_unique_identifiers.html).
 
 #### vscpl2drv-websrv driver config
 
@@ -226,7 +213,7 @@ The configuration file have the following format
         "file-log-max-files": 7,
     },    
     "auth-domain": "mydomain.com",
-    "key-file": "/var/vscp/.vscp.key"
+    "key-file": "/var/vscp/.vscp.key",
     "path-users" : "/etc/vscp/tcpip_srv_users.json",
     "response-timeout" : 0,
     "filter" : {
@@ -251,10 +238,10 @@ The configuration file have the following format
 ```
 
 ##### file-log-level
-Set to one of "off|critical|error|warn|info|debug|trace" for log level.
+Set to one of "off | critical | error | warn | info | debug | trace" to set log level.
 
 ##### file-log-path" : "path to log file",
-Set a writable path to a file that will get log information written to that file. This can be a valuable help if things does not behave as expected.
+This is a writable path to a file that will get log information written to it. This can be a valuable to have if things does not behave as expected.
 
 ##### file-log-pattern
 Pattern for log file rows.
@@ -266,9 +253,11 @@ Max size for log file before it will rotate and a new file is created. Default i
 Max number of log files to keep. Default is 7
 
 ##### write
-If write is true dynamic changes to the configuration file will be possible to save dynamically to disk. That is, settings you do at runtime can be saved and be persistent. The safest place for a configuration file is in the VSCP configuration folder */etc/vscp/* but for dynamic saves are not allowed if you don't run the VSCP daemon as root (which you should not). Next best place is to use the folder */var/lib/vscp/drivername/configure.xml*. This folder is created and a default configuration is written here when the driver is installed.
+If write is true changes to the configuration file will be possible to save to disk. That is settings you do at runtime that can be saved and after that be persistent. The safest location for a configuration file is in the VSCP configuration folder */etc/vscp/*, but dynamic saves are not allowed to save data to this location if you don't run the VSCP daemon as root (which you should not). Next best place is to use the folder */var/lib/vscp/drivername/configure.json*. This folder is created and a default configuration is written here when the driver is installed.
 
 If you never intend to change driver parameters during runtime consider moving the configuration file to the VSCP daemon configuration folder.
+
+Currently this option is not enabled and is always set to false.
 
 ##### interface
 Set the interface to listen on. Default is: *tcp://localhost:9598*. The interface is either secure (TLS) or insecure. It is not possible to define interfaces that accept connections of both types.
@@ -280,15 +269,15 @@ If port is omitted, default 9598 is used.
 For TLS/SSL use prefix "stcp://"
 
 ##### auth-domain
-The authentication domain. In reality this is an arbitrary string that is used when calulating md5 checksums. In this case the checksum is calulated over "user:auth-domain-password"
+The authentication domain. In reality this is an arbitrary string that is used when calculating md5 checksums. In this case the checksum is calculated over "user:auth-domain-password"
 
 ##### path-users
-The user database is separated from the configuration file for security reasons and should be stored in a folder that is only readable by the user of the host, usually the VSCP daemon.
+The user database is separated from the configuration file for security reasons and should be stored in a folder that is only readable by the user the VSCP daemon is run as. Usually this is the user __vscp__.
 
 The format for the user file is specified below.
 
 ##### response-timeout
-Response timeout in milliseconds. Connection will be restarted if this expires.
+Response timeout in milliseconds. 
 
 ##### encryption
 Response and commands from/to the tcp/ip link server can be encrypted using AES-128, AES-192 or AES-256. Set here as

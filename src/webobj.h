@@ -53,8 +53,8 @@ using json = nlohmann::json;
 // Seconds before trying to reconnect to a broken connection
 #define VSCP_WS1_DEFAULT_RECONNECT_TIME 30
 
-#define VSCP_WS_LOG_DRIVER_ID        "[vscpl2drv-ws] "
-#define VSCP_LEVEL2_DLL_WS_OBJ_MUTEX "___VSCP__DLL_L2TCPIPLINK_OBJ_MUTEX____"
+#define VSCP_WS_LOG_DRIVER_ID        "[vscpl2drv-websrv] "
+#define VSCP_LEVEL2_DLL_WS_OBJ_MUTEX "___VSCP__DLL_L2WEBSRV_OBJ_MUTEX____"
 #define VSCP_WS_LIST_MAX_MSG         2048
 
 // Module Local HLO op's
@@ -150,6 +150,7 @@ public:
   // bool sendEvent(vscpEvent* pev);
 
 public:
+
   /// Parsed Config file
   json m_j_config;
 
@@ -213,6 +214,9 @@ public:
   // Enable webserver
   bool m_bEnableWebServer;
 
+  // Enable http2
+  bool m_bEnableHttp2;
+
   // See
   // https://www.vscp.org/docs/vscpd/doku.php?id=configuring_the_vscp_daemon#webserver
   std::string m_web_document_root;
@@ -255,7 +259,7 @@ public:
   long m_web_linger_timeout_ms; // Set negative to not set
   bool m_web_decode_url;
   std::string m_web_global_auth_file;
-  std::string m_web_per_directory_auth_file;
+  std::string m_web_put_delete_auth_file;
   std::string m_web_ssi_patterns;
   std::string m_web_access_control_allow_origin;
   std::string m_web_access_control_allow_methods;

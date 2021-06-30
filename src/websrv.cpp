@@ -1706,12 +1706,12 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
   }
   mg_printf(conn, "<br>");
 
-  mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Per directory auth file:</b>");
+  mg_printf(conn, "&nbsp;&nbsp;&nbsp;&nbsp;<b>Put delete auth file:</b>");
   mg_printf(
     conn,
     "%s",
-    (const char*)std::string(pObj->m_web_per_directory_auth_file).c_str());
-  if (0 == pObj->m_web_per_directory_auth_file.length()) {
+    (const char*)std::string(pObj->m_web_put_delete_auth_file).c_str());
+  if (0 == pObj->m_web_put_delete_auth_file.length()) {
     mg_printf(conn, "Set to default.");
   }
   mg_printf(conn, "<br>");
@@ -2946,6 +2946,17 @@ start_webserver(void* cbdata)
   // Set setup options from configuration
   int pos = 0;
 
+  web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_ENABLE_HTTP2 + 4);
+  if (pObj->m_bEnableHttp2) { 
+    web_options[pos++] = vscp_strdup("yes");
+  }
+  else {
+    web_options[pos++] = vscp_strdup("no");
+  }
+  spdlog::get("logger")->debug("[settings:] {}={}",
+                               VSCPDB_CONFIG_NAME_WEB_ENABLE_HTTP2,
+                               pObj->m_bEnableHttp2 ? "yes" : "no");
+
   web_options[pos++] = vscp_strdup(VSCPDB_CONFIG_NAME_WEB_DOCUMENT_ROOT + 4);
   web_options[pos++] =
     vscp_strdup((const char*)pObj->m_web_document_root.c_str());
@@ -3301,14 +3312,14 @@ start_webserver(void* cbdata)
                                pObj->m_web_global_auth_file);   
   }
 
-  if (pObj->m_web_per_directory_auth_file.length()) {
+  if (pObj->m_web_put_delete_auth_file.length()) {
     web_options[pos++] =
-      vscp_strdup(VSCPDB_CONFIG_NAME_WEB_PER_DIRECTORY_AUTH_FILE + 4);
+      vscp_strdup(VSCPDB_CONFIG_NAME_WEB_PUT_DELETE_AUTH_FILE + 4);
     web_options[pos++] =
-      vscp_strdup((const char*)pObj->m_web_per_directory_auth_file.c_str());
+      vscp_strdup((const char*)pObj->m_web_put_delete_auth_file.c_str());
     spdlog::get("logger")->debug("[settings:] {}={}",
-                               VSCPDB_CONFIG_NAME_WEB_PER_DIRECTORY_AUTH_FILE,
-                               pObj->m_web_per_directory_auth_file);    
+                               VSCPDB_CONFIG_NAME_WEB_PUT_DELETE_AUTH_FILE,
+                               pObj->m_web_put_delete_auth_file);    
   }
 
   if (pObj->m_web_ssi_patterns.length()) {

@@ -1,3 +1,10 @@
+cmake_minimum_required(VERSION 3.5)
+project(man LANGUAGES CXX C)
+set(PACKAGE_AUTHOR "Ake Hedman, the VSCP Project")
+
+# --- System Libraries ---
+include(GNUInstallDirs)
+
 set(PANDOCCOMMAND_FOUND 0)
 find_program(PANDOCCOMMAND_PATH
   NAMES pandoc
@@ -20,14 +27,13 @@ if (${PANDOCCOMMAND_FOUND})
 
     ADD_CUSTOM_COMMAND(
         TARGET man
-        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/man/vscpl2drv-websock.md
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/man/vscpl2drv-websrv.md
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMAND pandoc -s -t man vscpl2drv-websock.1.md -o ${CMAKE_CURRENT_BINARY_DIR}/vscpl2drv-websock.1
-        OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/vscpl2drv-websock.1
-)
+        COMMAND pandoc -s -t man ${CMAKE_CURRENT_SOURCE_DIR}/vscpl2drv-websrv.1.md -o ${CMAKE_CURRENT_BINARY_DIR}/vscpl2drv-websrv.1
+        OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/vscpl2drv-websrv.1)
 endif()
 
 install(
-  FILES ${CMAKE_CURRENT_SOURCE_DIR}/vscpl2drv-websock.1
-  DESTINATION share/man/man1
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/vscpl2drv-websrv.1
+  DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
 )

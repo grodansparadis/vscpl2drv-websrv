@@ -151,6 +151,9 @@
 #define VSCPDB_CONFIG_NAME_WEB_ENABLE                   "web_enable"
 #define VSCPDB_CONFIG_DEFAULT_WEB_ENABLE                "1"
 
+#define VSCPDB_CONFIG_NAME_WEB_ENABLE_HTTP2             "enable_http2"
+#define VSCPDB_CONFIG_DEFAULT_ENABLE_HTTP2              "0"
+
 #define VSCPDB_CONFIG_NAME_WEB_DOCUMENT_ROOT            "web_document_root"
 #define VSCPDB_CONFIG_DEFAULT_WEB_DOCUMENT_ROOT         "/var/lib/vscp/web/html"
 
@@ -191,7 +194,7 @@
 #define VSCPDB_CONFIG_DEFAULT_WEB_SSL_CHIPHER_LIST      "DES-CBC3-SHA:AES128-SHA:AES128-GCM-SHA256"
 
 #define VSCPDB_CONFIG_NAME_WEB_SSL_PROTOCOL_VERSION     "web_ssl_protocol_version"
-#define VSCPDB_CONFIG_DEFAULT_WEB_SSL_PROTOCOL_VERSION  "0"
+#define VSCPDB_CONFIG_DEFAULT_WEB_SSL_PROTOCOL_VERSION  "4"
 
 #define VSCPDB_CONFIG_NAME_WEB_SSL_SHORT_TRUST          "web_ssl_short_trust"
 #define VSCPDB_CONFIG_DEFAULT_WEB_SSL_SHORT_TRUST       "0"
@@ -244,11 +247,11 @@
 #define VSCPDB_CONFIG_NAME_WEB_DECODE_URL               "web_decode_url"
 #define VSCPDB_CONFIG_DEFAULT_WEB_DECODE_URL            "1"
 
-#define VSCPDB_CONFIG_NAME_WEB_GLOBAL_AUTHFILE          "web_global_authfile"
-#define VSCPDB_CONFIG_DEFAULT_WEB_GLOBAL_AUTHFILE       ""
+#define VSCPDB_CONFIG_NAME_WEB_GLOBAL_AUTHFILE                  "web_global_authfile"
+#define VSCPDB_CONFIG_DEFAULT_WEB_GLOBAL_AUTHFILE               ""
 
-#define VSCPDB_CONFIG_NAME_WEB_PER_DIRECTORY_AUTH_FILE          "web_per_directory_auth_file"
-#define VSCPDB_CONFIG_DEFAULT_WEB_PER_DIRECTORY_AUTH_FILE       ""
+#define VSCPDB_CONFIG_NAME_WEB_PUT_DELETE_AUTH_FILE             "web_put_delete_auth_file"
+#define VSCPDB_CONFIG_DEFAULT_WEB_PUT_DELETE_AUTH_FILE          ""
 
 #define VSCPDB_CONFIG_NAME_WEB_SSI_PATTERNS                     "web_ssi_patterns"
 #define VSCPDB_CONFIG_DEFAULT_WEB_SSI_PATTERNS                  ""

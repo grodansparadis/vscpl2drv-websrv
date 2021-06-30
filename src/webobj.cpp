@@ -112,24 +112,25 @@ CWebObj::CWebObj()
   auto console = spdlog::stdout_color_mt("console");
   // Start out with level=info. Config may change this
   console->set_level(spdlog::level::debug);
-  console->set_pattern("[vscpl2drv-websrv] [%^%l%$] %v");
+  console->set_pattern("[vscpl2drv-websrv %c] [%^%l%$] %v");
   spdlog::set_default_logger(console);
 
   console->debug("Starting the vscpl2drv-websrv...");
 
   m_bConsoleLogEnable = true;
   m_consoleLogLevel   = spdlog::level::info;
-  m_consoleLogPattern = "[vscp] [%^%l%$] %v";
+  m_consoleLogPattern = "[vscpl2drv-websrv %c] [%^%l%$] %v";
 
   m_bFileLogEnable   = true;
   m_fileLogLevel     = spdlog::level::info;
-  m_fileLogPattern   = "[vscp] [%^%l%$] %v";
+  m_fileLogPattern   = "[vscpl2drv-websrv %c] [%^%l%$] %v";
   m_path_to_log_file = "/var/log/vscp/vscpl2drv-websrv.log";
   m_max_log_size     = 5242880;
   m_max_log_files    = 7;
 
   // Set defaults (WEB)
   m_bEnableWebServer    = true;
+  m_bEnableHttp2 = false;
   m_web_document_root   = "/var/lib/vscp/web/html";
   m_web_listening_ports = "[::]:8888r, [::]:8843s, 8884";
   m_web_index_files     = "index.xhtml, index.html, index.htm ,index.lp, "
@@ -148,7 +149,7 @@ CWebObj::CWebObj()
   m_web_ssl_verify_depth         = 9;
   m_web_ssl_default_verify_paths = true;
   m_web_ssl_cipher_list          = "DES-CBC3-SHA:AES128-SHA:AES128-GCM-SHA256";
-  m_web_ssl_protocol_version     = 3;
+  m_web_ssl_protocol_version     = 4;
   m_web_ssl_short_trust          = false;
   m_web_ssl_cache_timeout        = -1;
 
@@ -170,7 +171,7 @@ CWebObj::CWebObj()
   long m_web_linger_timeout_ms                   = 0;
   bool m_web_decode_url                          = true;
   std::string m_web_global_auth_file             = "";
-  std::string m_web_per_directory_auth_file      = "";
+  std::string m_web_put_delete_auth_file         = "";
   std::string m_web_ssi_patterns                 = "";
   std::string m_web_access_control_allow_origin  = "*";
   std::string m_web_access_control_allow_methods = "*";
@@ -813,6 +814,11 @@ CWebObj::doLoadConfig(void)
       m_bEnableWebServer = j["enable"].get<bool>();
     }
 
+    // Enable web server
+    if (j.contains("http2") && j["http2"].is_boolean()) {
+      m_bEnableHttp2 = j["http2"].get<bool>();
+    }
+
     // document-root: .
     // A directory to serve. By default, the current working directory is
     // served. The current directory is commonly referenced as dot (.). It is
@@ -1180,10 +1186,6 @@ CWebObj::doLoadConfig(void)
     }
 
     // global-auth-file : "",
-    if (j.contains("global-auth-file") && j["global-auth-file"].is_string()) {
-      m_web_global_auth_file = j["global-auth-file"].get<std::string>();
-    }
-
     // per-directory-auth-file : "",
     // Path to a global passwords file, either full path or relative to the
     // current working directory. If set, per-directory .htpasswd files are
@@ -1198,8 +1200,13 @@ CWebObj::doLoadConfig(void)
     // online tools e.g. this generator
     // http://www.askapache.com/online-tools/htpasswd-generator
 
-    if (j.contains("per-directory-auth-file") && j["per-directory-auth-file"].is_string()) {
-      m_web_per_directory_auth_file = j["per-directory-auth-file"].get<std::string>();
+    if (j.contains("global-auth-file") && j["global-auth-file"].is_string()) {
+      m_web_global_auth_file = j["global-auth-file"].get<std::string>();
+    }
+
+    // Not available anymore  TODO
+    if (j.contains("put-delete-auth-file") && j["put-delete-auth-file"].is_string()) {
+      m_web_put_delete_auth_file = j["put-delete-auth-file"].get<std::string>();
     }
 
     // ssi-patterns : "**.shtml$|**.shtm$"
@@ -1839,19 +1846,19 @@ CWebObj::doLoadConfig(void)
       m_bEnableWebsockets = j["enable"].get<bool>();
     }
 
-    // websocket-root : "",
-    if (j.contains("websocket-root") && j["websocket-root"].is_string()) {
-      m_websocket_document_root = j["websocket-root"].get<std::string>();
+    // root : "",
+    if (j.contains("root") && j["websocket-root"].is_string()) {
+      m_websocket_document_root = j["root"].get<std::string>();
     }
 
-    // websocket-timeout-ms : 2000,
-    if (j.contains("websocket-timeout-ms") && j["websocket-timeout-ms"].is_number()) {
-      m_websocket_timeout_ms = j["websocket-timeout-ms"].get<long>();
+    // timeout-ms : 2000,
+    if (j.contains("timeout-ms") && j["timeout-ms"].is_number()) {
+      m_websocket_timeout_ms = j["timeout-ms"].get<long>();
     }
 
-    // enable-websocket-ping-pong : false,
-    if (j.contains("enable-websocket-ping-pong") && j["enable-websocket-ping-pong"].is_boolean()) {
-      bEnable_websocket_ping_pong = j["enable-websocket-ping-pong"].get<bool>();
+    // enable-ping-pong : false,
+    if (j.contains("enable-ping-pong") && j["enable-ping-pong"].is_boolean()) {
+      bEnable_websocket_ping_pong = j["enable-ping-pong"].get<bool>();
     }
 
   } // websocket

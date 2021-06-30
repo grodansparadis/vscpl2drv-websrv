@@ -151,7 +151,7 @@
 #define VSCPDB_CONFIG_NAME_WEB_ENABLE                   "web_enable"
 #define VSCPDB_CONFIG_DEFAULT_WEB_ENABLE                "1"
 
-#define VSCPDB_CONFIG_NAME_WEB_ENABLE_HTTP2             "enable_http2"
+#define VSCPDB_CONFIG_NAME_WEB_ENABLE_HTTP2             "web_enable_http2"
 #define VSCPDB_CONFIG_DEFAULT_ENABLE_HTTP2              "0"
 
 #define VSCPDB_CONFIG_NAME_WEB_DOCUMENT_ROOT            "web_document_root"

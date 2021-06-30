@@ -19,7 +19,7 @@
 
     "web" : {
         "enable" : true,
-        "document-root": "/var/lib/vscp/web/html",
+        "document-root": "/var/lib/vscp/web/html/",
         "listening-ports" :  "8884",
         "authentication-domain": "mydomain.com",
         "enable-auth-domain-check" : false,

@@ -100,7 +100,7 @@ CWebObj::CWebObj()
   sem_init(&m_semSendQueue, 0, 0);
   sem_init(&m_semReceiveQueue, 0, 0);
 
-  //pthread_mutex_init(&m_mutexSendQueue, NULL);
+  // pthread_mutex_init(&m_mutexSendQueue, NULL);
   pthread_mutex_init(&m_mutexReceiveQueue, NULL);
 
   // Init pool
@@ -130,7 +130,7 @@ CWebObj::CWebObj()
 
   // Set defaults (WEB)
   m_bEnableWebServer    = true;
-  m_bEnableHttp2 = false;
+  m_bEnableHttp2        = false;
   m_web_document_root   = "/var/lib/vscp/web/html";
   m_web_listening_ports = "[::]:8888r, [::]:8843s, 8884";
   m_web_index_files     = "index.xhtml, index.html, index.htm ,index.lp, "
@@ -217,7 +217,7 @@ CWebObj::~CWebObj()
   sem_destroy(&m_semSendQueue);
   sem_destroy(&m_semReceiveQueue);
 
-  //pthread_mutex_destroy(&m_mutexSendQueue);
+  // pthread_mutex_destroy(&m_mutexSendQueue);
   pthread_mutex_destroy(&m_mutexReceiveQueue);
 
   // Shutdown logger in a nice way
@@ -287,7 +287,6 @@ CWebObj::close(void)
 
 // ----------------------------------------------------------------------------
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // eventToReceiveQueue
 //
@@ -353,7 +352,7 @@ CWebObj::eventExToReceiveQueue(vscpEventEx &ex)
 bool
 CWebObj::addEvent2SendQueue(const vscpEvent *pEvent)
 {
-  //pthread_mutex_lock(&m_mutexSendQueue);
+  // pthread_mutex_lock(&m_mutexSendQueue);
   // m_sendList.push_back((vscpEvent*)pEvent);
   // sem_post(&m_semSendQueue);
   // pthread_mutex_lock(&m_mutexSendQueue);
@@ -2335,11 +2334,11 @@ workerThreadSend(void *pData)
     //     continue;
     //   }
 
-      // Send event to all open ws1 and ws2 websockets
-      websock_post_outgoingEvent(pObj);
+    // Send event to all open ws1 and ws2 websockets
+    websock_post_outgoingEvent(pObj);
 
-      // Yes there is data to send
-      // Send it out to the remote server
+    // Yes there is data to send
+    // Send it out to the remote server
     //   pthread_mutex_lock(&pObj->m_mutex_clientList);
     //   pObj->m_clientList.sendEventAllClients(pEvent);
     //   pthread_mutex_unlock(&pObj->m_mutex_clientList);
@@ -2357,7 +2356,7 @@ workerThreadSend(void *pData)
 // Receive worker thread
 //
 
-void * 
+void *
 workerThreadReceive(void *pData)
 {
   spdlog::get("logger")->debug("Starting receive worker thread");

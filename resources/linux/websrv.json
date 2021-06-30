@@ -1,29 +1,26 @@
 {
     "write" : false,
-    "debug" : false,
-    "key-file": "/var/vscp/.key",
+    "debug" : true,
+    "key-file": "/etc/vscp/vscp.key",
     "path-users" : "/etc/vscp/users.json",
     "encryption" : "none|aes128|aes192|aes256",
 
     "logging": { 
         "console-enable": true,
         "console-level": "trace",
-        "console-pattern": "[vcpl2drv-websrv] [%^%l%$] %v",
+        "console-pattern": "[vcpl2drv-websrv: %c] [%^%l%$] %v",
         "file-enable": true,
-        "file-log-level": "off|critical|error|warn|info|debug|trace",
-        "file-log-path" : "/var/log/vscp/vscpl1drv-websrv.log",
-        "file-log-pattern": "[vcpl2drv-websrv] [%^%l%$] %v",
-        "file-log-max-size": 50000,
-        "file-log-max-files": 7
+        "file-level": "trace",
+        "file-path" : "/tmp/vscpl1drv-websrv.log",
+        "file-pattern": "[vcpl2drv-websrv %c] [%^%l%$] %v",
+        "file-max-size": 50000,
+        "file-max-files": 7
     }, 
+
     "web" : {
         "enable" : true,
         "document-root": "/var/lib/vscp/web/html",
-        "listening-ports" : [
-            "[::]:8888r",
-            "[::]:8843s",
-            "8884"
-        ],
+        "listening-ports" :  "8884",
         "authentication-domain": "mydomain.com",
         "enable-auth-domain-check" : false,
         "index-files" : [
@@ -39,6 +36,7 @@
         ],        
         "access-log-file" : "/var/log/vscp/vscpl2drv-websrv-access.log",
         "error-log-file" : "/var/log/vscp/vscpl2drv-websrv-error.log",
+        
         "protect-uri" : "",
         "throttle" : "",
         "enable-directory-listing" : true,
@@ -53,7 +51,7 @@
         "linger-timeout-ms" : 0,
         "decode-url" : true,
         "global-auth-file" : "",
-        "put-delete-auth-file" : "",
+        "per-directory-auth-file" : "",
         "ssi-patterns" : "",
         "access-control-allow-origin" : "*",
         "access-control-allow-methods" : "*",
@@ -65,10 +63,10 @@
         "strict-transport-security-max-age" : 0,
         "allow-sendfile-call" : true,
         "additional-header" : "",
-        "max-request-size" : 16384,
+        "max-request-size" : 65384,
         "allow-index-script-resource" : false,
         "tls": {
-            "certificate" : "/srv/vscp/certs/tcpip_server.pem",
+            "certificate" : "/home/akhe/development/VSCP/vscpl2drv-websrv/debug/cert/server.pem",
             "certificate-chain" : "",
             "verify-peer" : false,
             "ca-path" : "",
@@ -103,12 +101,11 @@
     },
     "websocket" : {
         "enable" : true,
-        "root" : "",
-        "timeout-ms" : 2000,
-        "websocket-ping-pong" : false
+        "websocket-root" : "",
+        "websocket-timeout-ms" : 2000,
+        "enable-websocket-ping-pong" : false
     },
 
-    
     "filter" : {
         "in-filter" : "incoming filter on string form",
         "in-mask" : "incoming mask on string form",

@@ -355,4 +355,7 @@ else()
             LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_}${VSCP_LEVEL2_DRV_DIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_MANDIR}            
             RESOURCE DESTINATION ${CMAKE_INSTALL_FULL_}/var/lib/vscp/vscpd) 
+    install(FILES ${CMAKE_SOURCE_DIR}/resources/linux/websrv.json
+            ${CMAKE_SOURCE_DIR}/resources/linux/users.json
+            DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/vscpl2drv-websrv/")           
 endif()

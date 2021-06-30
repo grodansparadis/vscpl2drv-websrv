@@ -865,10 +865,7 @@ Outgoing filter on string form. The string filter has the form _"filter-priority
 Outgoing mask on string form. The string mask has the form _"mask-priority, 
     mask-class, mask-type, mask-GUID”_.
 
-------------------------------------------------------------------------------------------------------
-
-
-
+---
 
 
 ##### filter
@@ -892,9 +889,16 @@ Read the vscpd manual for more information about how filter/masks work.
 The default filter/mask pair means that all events are received by the driver.
 
 
-
- 
-
-
 ## Using the vscpl2drv-websrv driver
 
+The [vscp-ux](https://github.com/grodansparadis/vscp-ux) contains a set of pages and script to test the web/websocket and REST functionality provided by this driver. Instructions on how to install is on the repository.
+
+There is currently no documentation for LUA and Diktape and the rest of the functionality. Until this documentation is in place please check the version 14.0 documentation. There is also some information in the [Civetweb project](https://github.com/civetweb/civetweb) which is the base code for the webserver functionality.
+
+---
+
+## Other sources with information
+
+  * The VSCP site - https://www.vscp.org
+  * The VSCP document site - https://docs.vscp.org/
+  * VSCP discussions - https://github.com/grodansparadis/vscp/discussions

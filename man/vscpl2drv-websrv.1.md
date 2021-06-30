@@ -1,10 +1,10 @@
-% vscpl2drv-template(1) VSCP Level II Logger Driver
+% vscpl2drv-websrv(1) VSCP Level II Web Server Driver
 % Åke Hedmann, Grodans Paradis AB
-% January 02, 2020
+% June 30, 2021
 
 # NAME
 
-vscpl2drv-template - VSCP Level I Socketcan Driver
+vscpl2drv-websrv - VSCP Level II web server Driver
 
 # SYNOPSIS
 

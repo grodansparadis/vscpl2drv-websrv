@@ -1,6 +1,6 @@
 {
     "write" : false,
-    "debug" : false,
+    "debug" : true,
     "key-file": "/etc/vscp/vscp.key",
     "path-users" : "/etc/vscp/users.json",
     "encryption" : "none|aes128|aes192|aes256",
@@ -8,11 +8,11 @@
     "logging": { 
         "console-enable": true,
         "console-level": "trace",
-        "console-pattern": "[vcpl2drv-websrv] [%^%l%$] %v",
+        "console-pattern": "[vcpl2drv-websrv: %c] [%^%l%$] %v",
         "file-enable": true,
         "file-level": "trace",
         "file-path" : "/tmp/vscpl1drv-websrv.log",
-        "file-pattern": "[vcpl2drv-websrv] [%^%l%$] %v",
+        "file-pattern": "[vcpl2drv-websrv %c] [%^%l%$] %v",
         "file-max-size": 50000,
         "file-max-files": 7
     }, 
@@ -106,7 +106,6 @@
         "enable-websocket-ping-pong" : false
     },
 
-    
     "filter" : {
         "in-filter" : "incoming filter on string form",
         "in-mask" : "incoming mask on string form",

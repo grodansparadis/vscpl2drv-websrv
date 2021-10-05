@@ -30,8 +30,8 @@
                 "/usr/include/x86_64-linux-gnu",
                 "/usr/include",
                 "/usr/local/include",
-                "${workspaceRoot}", 
-                "${workspaceRoot}/src/",                   
+                "${workspaceRoot}",
+                "${workspaceRoot}/src/",
                 "${workspaceFolder}/../vscp/src/common/",
                 "${workspaceFolder}/../vscp/src/vscp/common/",
                 "${workspaceFolder}/../vscp/src/common/third_party/",
@@ -53,8 +53,8 @@
                     "/usr/include/x86_64-linux-gnu",
                     "/usr/include",
                     "/usr/local/include",
-                    "${workspaceRoot}", 
-                    "${workspaceRoot}/src/",                   
+                    "${workspaceRoot}",
+                    "${workspaceRoot}/src/",
                     "${workspaceFolder}/../vscp/src/common/",
                     "${workspaceFolder}/../vscp/src/vscp/common/",
                     "${workspaceFolder}/../vscp/src/common/third_party/",
@@ -66,14 +66,15 @@
                     "${workspaceFolder}/../vscp/src/common/third_party/lua-5.4.3/",
                     "${workspaceFolder}/../vscp/src/common/third_party/spdlog-1.8.5/include/",
                     "${workspaceFolder}/../vscp/src/common/third_party/sqlite3-3.35.4/",
-                    "${workspaceFolder}/../vscp/src/common/third_party/tiny-aes-c/"                    
+                    "${workspaceFolder}/../vscp/src/common/third_party/tiny-aes-c/"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
             },
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",
-            "cppStandard": "c++17"
+            "cppStandard": "c++17",
+            "configurationProvider": "nrf-connect"
         },
         {
             "name": "Win32",

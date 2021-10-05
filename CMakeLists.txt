@@ -240,10 +240,10 @@ add_library(vscpl2drv-websrv
     ${VSCP_PATH}/src/vscp/common/userlist.cpp
     ${VSCP_PATH}/src/vscp/common/clientlist.h
     ${VSCP_PATH}/src/vscp/common/clientlist.cpp    
-    ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/civetweb.c
-    ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src/mod_lua.inl
+    ${VSCP_PATH}/src/common/third_party/civetweb-1.15/src/civetweb.c
+    ${VSCP_PATH}/src/common/third_party/civetweb-1.15/src/mod_lua.inl
     ${VSCP_PATH}/src/common/third_party/mustache.hpp
-    ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
+    ${VSCP_PATH}/src/common/third_party/spdlog-1.9.2/include
     ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/duktape.c 
     ${VSCP_PATH}/src/common/third_party/sqlite3-3.35.4/sqlite3.c
     ${VSCP_PATH}/src/common/third_party/lsqlite3.c
@@ -288,9 +288,9 @@ if (WIN32)
         ${VSCP_PATH}/src/common
         ${VSCP_PATH}/src/common/third_party
         ${VSCP_PATH}/src/common/third_party/nlohmann
-        ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
-        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src
-        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/include
+        ${VSCP_PATH}/src/common/third_party/spdlog-1.9.2/include
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.15/src
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.15/include
         ${VSCP_PATH}/src/common/third_party/lua-5.4.3/
 	    ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/
 	    ${VSCP_PATH}/src/common/third_party/sqlite3-3.35.4/ 
@@ -305,9 +305,9 @@ else()
         ${VSCP_PATH}/src/common
         ${VSCP_PATH}/src/common/third_party
         ${VSCP_PATH}/src/common/third_party/nlohmann
-        ${VSCP_PATH}/src/common/third_party/spdlog-1.8.5/include
-        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/src
-        ${VSCP_PATH}/src/common/third_party/civetweb-1.14/include
+        ${VSCP_PATH}/src/common/third_party/spdlog-1.9.2/include
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.15/src
+        ${VSCP_PATH}/src/common/third_party/civetweb-1.15/include
         ${VSCP_PATH}/src/common/third_party/lua-5.4.3/
 	    ${VSCP_PATH}/src/common/third_party/duktape-2.6.0/src/
 	    ${VSCP_PATH}/src/common/third_party/sqlite3-3.35.4/ 

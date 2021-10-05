@@ -811,7 +811,6 @@ Enable websocket ping-pong functionality.
 
 Default is **false**
 
-#### filter
 
 ##### Filters
 
@@ -902,3 +901,9 @@ There is currently no documentation for LUA and Diktape and the rest of the func
   * The VSCP site - https://www.vscp.org
   * The VSCP document site - https://docs.vscp.org/
   * VSCP discussions - https://github.com/grodansparadis/vscp/discussions
+
+---
+  
+## Copyright
+Copyright (C) 2000-2021 Åke Hedman, The VSCP Project - MIT license.
+

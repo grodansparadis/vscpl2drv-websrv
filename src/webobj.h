@@ -36,13 +36,13 @@
 #include <unistd.h>
 
 #include <canal.h>
-#include <canal_macro.h>
+#include <canal-macro.h>
 #include <clientlist.h>
 #include <guid.h>
 #include <userlist.h>
 #include <vscp.h>
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/spdlog.h"

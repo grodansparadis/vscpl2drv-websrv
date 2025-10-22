@@ -29,7 +29,7 @@
 #define _POSIX
 
 #include <canal.h>
-#include <canal_macro.h>
+#include <canal-macro.h>
 #include <hlo.h>
 #include <pthread.h>
 #include <stdio.h>

@@ -64,7 +64,7 @@
 
 #include <civetweb.h>
 #include <expat.h>
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 #include <actioncodes.h>
 //#include <controlobject.h>
@@ -73,8 +73,8 @@
 #include <remotevariablecodes.h>
 #include <version.h>
 #include <vscp.h>
-#include <vscp_aes.h>
-#include <vscp_debug.h>
+#include <vscp-aes.h>
+#include <vscp-debug.h>
 #include <vscphelper.h>
 #include <websocketsrv.h>
 #include <websrv.h>
@@ -83,7 +83,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <spdlog/async.h>

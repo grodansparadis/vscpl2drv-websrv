@@ -41,7 +41,7 @@
 #include "vscpl2drv-websrv.h"
 #include "webobj.h"
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <spdlog/async.h>

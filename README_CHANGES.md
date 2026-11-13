@@ -7,6 +7,8 @@ tagged, rename **Unreleased** to the version and date, and start a new
 
 ## Unreleased
 
+- Add scripts/download-artifacts.sh to download and verify the newest CI build artifacts
+- CI writes a SHA256SUMS-<artifact> checksum file into every uploaded build artifact
 - Adopted for new src structure (7d6f773)
 - Cleaned up (5f5345c)
 - Updated dependencies (842678f)

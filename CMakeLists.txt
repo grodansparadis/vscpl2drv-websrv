@@ -26,8 +26,11 @@
 # -DVSCP_PATH="path"
 #
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(vscpl2drv-websrv LANGUAGES CXX C)
+
+# Third-party sources (formerly git submodules)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies.cmake)
 set(PACKAGE_AUTHOR "Ake Hedman, the VSCP Project")
 
 # Version settings
@@ -236,40 +239,40 @@ add_library(vscpl2drv-websrv
     ${CMAKE_CURRENT_SOURCE_DIR}/src/duktape_vscp_func.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/duktape_vscp_wrkthread.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/duktape_vscp_wrkthread.cpp
-    third_party/vscp/src/vscp/common/userlist.h
-    third_party/vscp/src/vscp/common/userlist.cpp
-    third_party/vscp/src/vscp/common/clientlist.h
-    third_party/vscp/src/vscp/common/clientlist.cpp    
-    third_party/vscp/src/vscp/common/vscp.h
-    third_party/vscp/src/vscp/common/vscpremotetcpif.h
-    third_party/vscp/src/vscp/common/vscpremotetcpif.cpp
-    third_party/vscp/src/vscp/common/vscpdatetime.h
-    third_party/vscp/src/vscp/common/vscpdatetime.cpp
-    third_party/vscp/src/vscp/common/guid.h
-    third_party/vscp/src/vscp/common/guid.cpp
-    third_party/vscp/src/vscp/common/mdf.h
-    third_party/vscp/src/vscp/common/mdf.cpp
-    third_party/vscp/src/vscp/common/vscphelper.h
-    third_party/vscp/src/vscp/common/vscphelper.cpp
-    third_party/vscp/src/vscp/common/canal.h
-    third_party/vscp/src/common/sockettcp.h
-    third_party/vscp/src/common/sockettcp.c
-    third_party/vscp/src/common/vscpbase64.h
-    third_party/vscp/src/common/vscpbase64.c
-    third_party/vscp/src/common/vscp-aes.h
-    third_party/vscp/src/common/vscp-aes.c
-    third_party/vscp/src/common/crc.h
-    third_party/vscp/src/common/crc.c
-    third_party/vscp/src/common/crc8.h
-    third_party/vscp/src/common/crc8.c
-    third_party/vscp/src/common/vscpmd5.h
-    third_party/vscp/src/common/vscpmd5.c
-    third_party/civetweb/src/civetweb.c
-    third_party/civetweb/src/mod_lua.inl
-    third_party/Mustache/mustache.hpp
-    third_party/spdlog/include
-    third_party/duktape-2.7.0/src/duktape.c
-    third_party/sqlite3-3.50.4/sqlite3.c
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/userlist.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/userlist.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/clientlist.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/clientlist.cpp    
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscp.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpremotetcpif.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpremotetcpif.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpdatetime.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpdatetime.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/guid.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/guid.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/mdf.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/mdf.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.h
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/canal.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/sockettcp.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/sockettcp.c
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.c
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.c
+    ${THIRD_PARTY_VSCP_DIR}/src/common/crc.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/crc.c
+    ${THIRD_PARTY_VSCP_DIR}/src/common/crc8.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/crc8.c
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscpmd5.h
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscpmd5.c
+    ${THIRD_PARTY_CIVETWEB_DIR}/src/civetweb.c
+    ${THIRD_PARTY_CIVETWEB_DIR}/src/mod_lua.inl
+    ${THIRD_PARTY_MUSTACHE_DIR}/mustache.hpp
+    ${THIRD_PARTY_SPDLOG_DIR}/include
+    ${THIRD_PARTY_DUKTAPE_DIR}/src/duktape.c
+    ${THIRD_PARTY_SQLITE3_DIR}/sqlite3.c
     third_party/lsqlite3.c
     third_party/sqlite3math.c
     third_party/lfs.c
@@ -284,16 +287,18 @@ if (WIN32)
     find_path(PTHREAD_INCLUDE_DIR pthread.h)
 
     include_directories( PUBLIC src/
-        third_party/vscp/src/vscp/common/  
-        third_party/vscp/src/common
-        third_party/Mustache
-        third_party/json/include
-        third_party/spdlog/include
-        third_party/civetweb/src
-        third_party/civetweb/include
-        third_party/lua
-        third_party/duktape
-        third_party/sqlite
+        ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
+        ${THIRD_PARTY_VSCP_DIR}/src/common
+        ${THIRD_PARTY_MUSTACHE_DIR}
+        ${THIRD_PARTY_JSON_DIR}/include
+        ${THIRD_PARTY_SPDLOG_DIR}/include
+        ${THIRD_PARTY_CIVETWEB_DIR}/src
+        ${THIRD_PARTY_CIVETWEB_DIR}/include
+        third_party
+        ${THIRD_PARTY_LUA_DIR}/src
+        ${THIRD_PARTY_LUA_PARENT_DIR}
+        ${THIRD_PARTY_DUKTAPE_DIR}/src
+        ${THIRD_PARTY_SQLITE3_DIR}
         ${PThreads4W_INCLUDE_DIR}
         ${CMAKE_BINARY_DIR}
         ${OPENSSL_INCLUDE_DIR}
@@ -301,16 +306,18 @@ if (WIN32)
         ${LOCAL_SYSLOG_INCLUDE} )
 else()
     include_directories( PUBLIC src/
-        third_party/vscp/src/vscp/common/  
-        third_party/vscp/src/common
-        third_party/Mustache
-        third_party/json/include
-        third_party/spdlog/include
-        third_party/civetweb/src
-        third_party/civetweb/include
-        third_party/lua
-        third_party/duktape
-        third_party/sqlite 
+        ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
+        ${THIRD_PARTY_VSCP_DIR}/src/common
+        ${THIRD_PARTY_MUSTACHE_DIR}
+        ${THIRD_PARTY_JSON_DIR}/include
+        ${THIRD_PARTY_SPDLOG_DIR}/include
+        ${THIRD_PARTY_CIVETWEB_DIR}/src
+        ${THIRD_PARTY_CIVETWEB_DIR}/include
+        third_party
+        ${THIRD_PARTY_LUA_DIR}/src
+        ${THIRD_PARTY_LUA_PARENT_DIR}
+        ${THIRD_PARTY_DUKTAPE_DIR}/src
+        ${THIRD_PARTY_SQLITE3_DIR} 
         ${CMAKE_BINARY_DIR}
         ${OPENSSL_INCLUDE_DIR}
         ${LOCAL_SYSLOG_INCLUDE} )

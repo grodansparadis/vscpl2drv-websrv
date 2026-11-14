@@ -7,6 +7,7 @@ tagged, rename **Unreleased** to the version and date, and start a new
 
 ## Unreleased
 
+- Man page vscpl2drv-websrv(1) describes the driver and its configuration file. It is converted from man/vscpl2drv-websrv.1.md with pandoc when the driver is built and installed in share/man/man1; old man page scripts and generated files are removed
 - Fix the CI checksum step: readable SHA256SUMS files, bash 3.2 on macOS, and jobs that run in a subfolder
 - Replace the third_party git submodules (civetweb, vscp, spdlog, json, Mustache) and the copied Lua 5.3.5, duktape 2.7.0 and SQLite 3.50.4 sources with CMake FetchContent (same versions)
 - Add scripts/download-artifacts.sh to download and verify the newest CI build artifacts

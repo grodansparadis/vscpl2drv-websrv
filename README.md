@@ -705,7 +705,7 @@ Default is **-1**.
 
 ###### cgi-interpreter
 
-Path to an executable to use as CGI interpreter for all CGI scripts regardless of the script file extension. If this option is not set (which is the default), CivetWeb looks at first line of a CGI script, [shebang line](http://en.wikipedia.org/wiki/Shebang_(Unix\)), for an interpreter (not only on Linux and Mac but also for Windows).
+Path to an executable to use as CGI interpreter for all CGI scripts regardless of the script file extension. If this option is not set (which is the default), CivetWeb looks at first line of a CGI script, [shebang line](https://en.wikipedia.org/wiki/Shebang_%28Unix%29), for an interpreter (not only on Linux and Mac but also for Windows).
 
 For example, if both PHP and Perl CGIs are used, then #!/path/to/php-cgi.exe and #!/path/to/perl.exe must be first lines of the respective CGI scripts. Note that paths should be either full file paths, or file paths relative to the current working directory of the CivetWeb server. If CivetWeb is started by mouse double-click on Windows, the current working directory is the directory where the CivetWeb executable is located.
 

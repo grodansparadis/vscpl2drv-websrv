@@ -38,11 +38,11 @@ FetchContent_Declare(
     URL_HASH SHA256=7efc8e5da16b9af4fa8197822c49fe276f714041161c17b62b211ad61eb08bc5
     ${_tp_options}
 )
-# grodansparadis/vscp @ 8a3218b3e5a7eb1cf6bcc57fd7739f190d13b3a6
+# grodansparadis/vscp @ d75d4f5c6c097a1dca841b63727c79c522b701ce (master)
 FetchContent_Declare(
     tp_vscp
-    URL https://codeload.github.com/grodansparadis/vscp/tar.gz/8a3218b3e5a7eb1cf6bcc57fd7739f190d13b3a6
-    URL_HASH SHA256=cc032559604672b8f915db9b7ce5d39959a2d00964fbfe180baf3ea7abbbb34f
+    URL https://codeload.github.com/grodansparadis/vscp/tar.gz/d75d4f5c6c097a1dca841b63727c79c522b701ce
+    URL_HASH SHA256=709763c16c995b65787e72947f9c3f45a03a404c708286c7cad00b53dcaedbb5
     ${_tp_options}
 )
 # gabime/spdlog @ 486b55554f11c9cccc913e11a87085b2a91f706f

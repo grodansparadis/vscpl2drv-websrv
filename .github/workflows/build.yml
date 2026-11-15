@@ -1,81 +1,62 @@
 name: Build
 
-on: [push]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
-env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Release
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Linux (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    strategy:  
+    strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-18.04, ubuntu-latest]
+        os: [ubuntu-22.04, ubuntu-latest]
 
     steps:
-    # https://github.com/actions/checkout  
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-    - name: Checkout vscp repo
-      uses: actions/checkout@v2
-      with:
-        repository: grodansparadis/vscp
-        path: vscp
-        ref: master
-     
-    - name: Checkout google test repo
-      run: sudo apt-get install libgtest-dev && cd /usr/src/gtest && sudo mkdir build && cd build && sudo cmake .. && sudo make DESTDIR=/usr/lib
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libssl-dev libexpat1-dev \
+            libcurl4-openssl-dev zlib1g-dev pandoc
 
-    - name: Update before installing packages
-      run: sudo apt-get update
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/
 
-    - name: Install libexpat-dev manually
-      run: sudo apt-get install libexpat-dev pandoc
-      
-    - name: Install support libssl
-      run: sudo apt install git libssl-dev libexpat-dev libz-dev
+      - name: Build
+        run: cmake --build build --parallel
 
-    - name: Install libssl-dev manually
-      run: sudo apt-get install libssl-dev
+      - name: Check that the driver loads
+        run: |
+          cc ci/check-driver.c -o build/check-driver -ldl
+          build/check-driver "$(ls build/libvscpl2drv-websrv.so* | head -1)"
 
-    - name: Create Build Environment
-      # Some projects don't allow in-source building, so create a separate build directory
-      # We'll use this as our working directory for all subsequent commands
-      run: cmake -E make_directory ${{github.workspace}}/build
+      - name: Package
+        working-directory: build
+        run: |
+          cpack -G DEB
+          ls -l *.deb
 
-    - name: Configure CMake
-      # Use a bash shell so we can use the same syntax for environment variable
-      # access regardless of the host operating system
-      shell: bash
-      working-directory: ${{github.workspace}}/build
-      # Note the current convention is to use the -S and -B options here to specify source 
-      # and build directories, but this is only available with CMake 3.13 and higher.  
-      # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-      #run: cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DVSCP_PATH=vscp/
-      run: cmake .. -DCMAKE_INSTALL_PREFIX=/ -DVSCP_PATH=vscp/
+      - name: Write SHA256SUMS
+        id: sha256sums
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash "${GITHUB_WORKSPACE//\\//}/.github/scripts/write-sha256sums.sh" "SHA256SUMS-vscpl2drv-websrv-${{ matrix.os }}" <<'SHA256SUMS_PATTERNS'
+          build/*.deb
+          SHA256SUMS_PATTERNS
 
-    - name: Build
-      working-directory: ${{github.workspace}}/build
-      shell: bash
-      # Execute the build.  You can specify a specific target with "--target <NAME>"
-      run: |
-        make -j$(nproc)
-        sudo cpack -G DEB 
-        sudo make install DESTDIR=AppDir
-    - name: Write SHA256SUMS
-      id: sha256sums_66
-      continue-on-error: true
-      shell: bash
-      run: |
-        bash "${GITHUB_WORKSPACE//\\//}/.github/scripts/write-sha256sums.sh" "SHA256SUMS-${{ matrix.os }}_vscpl2drv-websrv_15.0.0.deb" <<'SHA256SUMS_PATTERNS'
-        /home/runner/work/vscpl2drv-websrv/vscpl2drv-websrv/build/vscpl2drv-websrv_15.0.0.deb
-        SHA256SUMS_PATTERNS
-
-    - uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.os }}_vscpl2drv-websrv_15.0.0.deb
-        path: |
-          /home/runner/work/vscpl2drv-websrv/vscpl2drv-websrv/build/vscpl2drv-websrv_15.0.0.deb
-          ${{ steps.sha256sums_66.outputs.file }}
-        retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscpl2drv-websrv-${{ matrix.os }}
+          path: |
+            build/*.deb
+            ${{ steps.sha256sums.outputs.file }}
+          if-no-files-found: error

@@ -189,6 +189,13 @@ else()
 
 endif()
 
+# mdf.cpp parses MDF files with expat and downloads them with curl
+if(NOT WIN32)
+    find_package(EXPAT REQUIRED)
+endif()
+find_package(CURL REQUIRED)
+
+
 # Set sockettcp build flags
 string(FIND "${OPENSSL_VERSION}" "1.1." SSL_VER_POS)
 if(${SSL_VER_POS})
@@ -239,10 +246,10 @@ add_library(vscpl2drv-websrv
     ${CMAKE_CURRENT_SOURCE_DIR}/src/duktape_vscp_func.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/duktape_vscp_wrkthread.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/duktape_vscp_wrkthread.cpp
-    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/userlist.h
-    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/userlist.cpp
-    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/clientlist.h
-    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/clientlist.cpp    
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp-legacy/userlist.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp-legacy/userlist.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp-legacy/clientlist.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp-legacy/clientlist.cpp    
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscp.h
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpremotetcpif.h
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpremotetcpif.cpp
@@ -254,9 +261,12 @@ add_library(vscpl2drv-websrv
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/mdf.cpp
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.h
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelperlogging.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelperlogging-forward.cpp
+    ${THIRD_PARTY_VSCP_DIR}/src/common/vscphelper-common.cpp
     ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/canal.h
-    ${THIRD_PARTY_VSCP_DIR}/src/common/sockettcp.h
-    ${THIRD_PARTY_VSCP_DIR}/src/common/sockettcp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp-legacy/sockettcp.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp-legacy/sockettcp.c
     ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.h
     ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.c
     ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.h
@@ -287,6 +297,7 @@ if (WIN32)
     find_path(PTHREAD_INCLUDE_DIR pthread.h)
 
     include_directories( PUBLIC src/
+        src/vscp-legacy/
         ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
         ${THIRD_PARTY_VSCP_DIR}/src/common
         ${THIRD_PARTY_MUSTACHE_DIR}
@@ -306,6 +317,7 @@ if (WIN32)
         ${LOCAL_SYSLOG_INCLUDE} )
 else()
     include_directories( PUBLIC src/
+        src/vscp-legacy/
         ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
         ${THIRD_PARTY_VSCP_DIR}/src/common
         ${THIRD_PARTY_MUSTACHE_DIR}
@@ -330,6 +342,7 @@ if (WIN32)
         OpenSSL::Crypto
         OpenSSL::SSL OpenSSL::Crypto
         expat::expat
+        CURL::libcurl
     )
         
 else()
@@ -341,7 +354,12 @@ else()
         OpenSSL::SSL 
         OpenSSL::Crypto
         ${EXPAT_LIBRARIES}
+        CURL::libcurl
     )
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # Fail at link time, not when the daemon loads the driver
+        target_link_options(vscpl2drv-websrv PRIVATE "-Wl,--no-undefined")
+    endif()
 endif()
 
 # Install

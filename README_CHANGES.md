@@ -7,6 +7,7 @@ tagged, rename **Unreleased** to the version and date, and start a new
 
 ## Unreleased
 
+- Builds and loads again with the current vscp: the user/client lists and sockettcp that vscp dropped are kept in src/vscp-legacy, renamed vscp headers, OpenSSL PBKDF2 instead of fastpbkdf2, civetweb_lua.h from the pinned civetweb, expat and curl linked. Decrypted websocket credentials are no longer written to the debug log. CI: one working Linux workflow (Ubuntu 22.04 and latest) that checks the driver loads and uploads the .deb
 - Build against the latest vscp master (d75d4f5c6)
 - Man page vscpl2drv-websrv(1) describes the driver and its configuration file. It is converted from man/vscpl2drv-websrv.1.md with pandoc when the driver is built and installed in share/man/man1; old man page scripts and generated files are removed
 - Fix the CI checksum step: readable SHA256SUMS files, bash 3.2 on macOS, and jobs that run in a subfolder

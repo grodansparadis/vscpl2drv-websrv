@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 #include <actioncodes.h>
 #include <userlist.h>

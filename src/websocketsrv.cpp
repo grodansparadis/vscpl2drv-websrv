@@ -212,9 +212,8 @@ websock_authentication(struct mg_connection *conn,
   memset(buf, 0, sizeof(buf));
   AES_CBC_decrypt_buffer(AES128, buf, secret, len, pSession->m_pParent->m_vscp_key, iv);
 
-  spdlog::get("logger")->debug("[ws] Buf: {} ", buf);
+  // buf holds "username:password" - never log it
   std::string str = std::string((const char *) buf);
-  spdlog::get("logger")->debug("[ws] Decrypted: {} ", str);
   std::deque<std::string> tokens;
   vscp_split(tokens, str, ":");
 
@@ -256,8 +255,8 @@ websock_authentication(struct mg_connection *conn,
     return false;
   }
 
-  std::string combined_credentials = strUser + ":" + strPassword;
-  if (!vscp_isPasswordValid(pUserItem->getPassword(), combined_credentials)) {
+  // The user list stores md5 over "user:password"
+  if (!pUserItem->validateUser(strPassword)) {
     spdlog::get("logger")->error("[ws] Authentication: User {} at host "
                                  "[{}] gave wrong password.",
                                  (const char *) strUser.c_str(),

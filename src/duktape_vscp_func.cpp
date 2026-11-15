@@ -40,7 +40,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 #include <actioncodes.h>
 //#include <duk_module_node.h>
@@ -55,7 +55,7 @@
 #include <vscpremotetcpif.h>
 #include <webdefs.h>
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <spdlog/async.h>

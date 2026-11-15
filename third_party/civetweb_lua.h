@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017 the Civetweb developers
+/* Copyright (c) 2015-2021 the Civetweb developers
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,9 +27,18 @@
 #define CIVETWEB_LUA_H
 
 #define LUA_LIB
+#define LUA_COMPAT_LOG10
+#define LUA_COMPAT_APIINTCASTS
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
 #include "lauxlib.h"
 #include "lua.h"
 #include "lualib.h"
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif
 
 #ifndef LUA_VERSION_NUM
 #error "Unknown Lua version"
@@ -40,7 +49,7 @@
 #define LUA_ERRGCMM 999 /* not supported */
 #define mg_lua_load(a, b, c, d, e) lua_load(a, b, c, d)
 #define lua_rawlen lua_objlen
-#define lua_newstate(a, b)                                                     \
+#define mg_lua_newstate(a, b)                                                  \
 	luaL_newstate() /* Must use luaL_newstate() for 64 bit target */
 #define lua_pushinteger lua_pushnumber
 #define luaL_newlib(L, t)                                                      \
@@ -53,21 +62,24 @@
 	}
 #define luaL_setfuncs(L, r, u) lua_register(L, r->name, r->func)
 
-#elif LUA_VERSION_NUM == 502
-/* Lua 5.2 detected */
+#elif LUA_VERSION_NUM == 502 || LUA_VERSION_NUM == 503 || LUA_VERSION_NUM == 504
+/* Lua 5.2 - 5.4 detected */
 #define mg_lua_load lua_load
+#define mg_lua_newstate lua_newstate
 
-#elif LUA_VERSION_NUM == 503
-/* Lua 5.3 detected */
-#define mg_lua_load lua_load
 
-#elif LUA_VERSION_NUM == 504
-/* Lua 5.4 detected */
+#elif LUA_VERSION_NUM == 505
+/* Lua 5.2 - 5.5 detected */
 #define mg_lua_load lua_load
+// A third parameter "seed for the hashing of strings" has been added
+#define mg_lua_newstate(f, ud) lua_newstate(f, ud, luaL_makeseed(NULL))
+
+#else
+#error "Lua version not supported (yet?)"
 
 #endif
 
-#ifdef LUA_VERSION_MAKEFILE
+#if defined(LUA_VERSION_MAKEFILE)
 #if LUA_VERSION_MAKEFILE != LUA_VERSION_NUM
 #error                                                                         \
     "Mismatch between Lua version specified in Makefile and Lua version in lua.h"

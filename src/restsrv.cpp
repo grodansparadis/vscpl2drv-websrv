@@ -63,22 +63,22 @@
 #include "web_js.h"
 #include "web_template.h"
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 #include <actioncodes.h>
 #include <civetweb.h>
 #include <mdf.h>
 #include <version.h>
 #include <vscp.h>
-#include <vscp_aes.h>
-#include <vscp_debug.h>
+#include <vscp-aes.h>
+#include <vscp-debug.h>
 #include <vscphelper.h>
 #include <webobj.h>
 #include <websrv.h>
 
 #include "restsrv.h"
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <spdlog/async.h>

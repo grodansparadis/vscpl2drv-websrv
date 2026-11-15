@@ -56,7 +56,7 @@ extern "C"
 #include <userlist.h>
 #include <version.h>
 #include <vscp.h>
-#include <vscp_debug.h>
+#include <vscp-debug.h>
 #include <vscpdatetime.h>
 #include <webdefs.h>
 #include <vscphelper.h>

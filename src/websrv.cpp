@@ -57,7 +57,7 @@
 // For version and copyright info
 #include <duktape.h>
 #include <expat.h>
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <lua.h>
 
 #include <openssl/crypto.h>
@@ -74,14 +74,14 @@
 #include "restsrv.h"
 #include "webobj.h"
 #include <actioncodes.h>
-#include <canal_macro.h>
-#include <fastpbkdf2.h>
+#include <canal-macro.h>
+#include <openssl/evp.h> // PKCS5_PBKDF2_HMAC
 #include <mdf.h>
 #include <remotevariablecodes.h>
 #include <restsrv.h>
 #include <version.h>
 #include <vscp.h>
-#include <vscp_aes.h>
+#include <vscp-aes.h>
 #include <vscpbase64.h>
 #include <vscpdatetime.h>
 #include <vscphelper.h>
@@ -95,7 +95,7 @@
 #include <sstream>
 #include <string>
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <spdlog/async.h>
@@ -950,13 +950,11 @@ vscp_password(struct mg_connection* conn, void* cbdata)
       return -1;
     }
 
-    fastpbkdf2_hmac_sha256((const uint8_t*)password,
-                           strlen(password),
-                           salt,
-                           16,
-                           70000,
-                           resultbuf,
-                           32);
+    // PBKDF2-HMAC-SHA256, 70000 iterations
+    if (1 != PKCS5_PBKDF2_HMAC(password, (int) strlen(password), salt, 16, 70000, EVP_sha256(), 32, resultbuf)) {
+      mg_printf(conn, "<p>Unable to generate the key.</p>");
+      return WEB_OK;
+    }
 
     mg_printf(conn, "<table>");
     mg_printf(conn, "</td><tr>");

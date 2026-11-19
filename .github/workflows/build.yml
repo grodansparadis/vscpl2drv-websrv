@@ -19,7 +19,7 @@ jobs:
         os: [ubuntu-22.04, ubuntu-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -53,7 +53,7 @@ jobs:
           build/*.deb
           SHA256SUMS_PATTERNS
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vscpl2drv-websrv-${{ matrix.os }}
           path: |
